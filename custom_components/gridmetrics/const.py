@@ -1,7 +1,7 @@
 """Constants for GridMetrics."""
 
 DOMAIN = "gridmetrics"
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 
 CONF_SOURCE_SENSOR = "source_sensor"
 CONF_CURRENCY = "currency"
