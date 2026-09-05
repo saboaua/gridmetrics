@@ -4,7 +4,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "tiered_tou_energy_cost"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "gridmetrics"))
 
 from calculations import calc_tiered_cost, get_current_tou_rate, get_cycle_bounds
 

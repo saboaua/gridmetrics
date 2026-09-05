@@ -1,4 +1,6 @@
-# Tiered / Time-of-Use Electricity Rate Calculator
+# GridMetrics
+
+**Tiered / Time-of-Use Electricity Rate Calculator**
 
 **HACS custom integration for Home Assistant – v0.2.1**
 
@@ -91,13 +93,13 @@ Choose from the dropdown (AWG, USD, MXN, JMD…). You can change it later in **C
 Enable prepaid tracking. After buying power:
 
 ```yaml
-service: tiered_tou_energy_cost.set_prepaid_balance
+service: gridmetrics.set_prepaid_balance
 data:
   entry_id: <config_entry_id>
   amount: 50.00
 ```
 
-Event `tiered_tou_energy_cost_prepaid_topup` is fired for notifications.
+Event `gridmetrics_prepaid_topup` is fired for notifications.
 
 ---
 
@@ -117,7 +119,7 @@ Event `tiered_tou_energy_cost_prepaid_topup` is fired for notifications.
 ## Installation
 
 **HACS:** Custom repository → this repo → Integration  
-**Manual:** copy `custom_components/tiered_tou_energy_cost/` into your config and restart.
+**Manual:** copy `custom_components/gridmetrics/` into your config and restart.
 
 ---
 
