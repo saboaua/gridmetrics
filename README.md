@@ -2,7 +2,7 @@
 
 **Tiered / Time-of-Use Electricity Rate Calculator**
 
-**HACS custom integration for Home Assistant – v0.2.1**
+**HACS custom integration for Home Assistant – v0.2.2**
 
 Calculate accurate electricity costs for **fixed-rate tiered (block) and/or Time-of-Use plans**, with **easy solar / net-metering onboarding**.
 

@@ -1,4 +1,4 @@
-"""Sensors for Tiered / TOU Electricity Rate Calculator + Solar net-metering."""
+"""Sensors for GridMetrics."""
 
 from __future__ import annotations
 
@@ -28,7 +28,8 @@ from .const import (
     CONF_TIERS,
     CONF_TOU_PERIODS,
     CONF_PREPAID_ENABLED,
-    CONF_HAS_SOLAR,
+    CONF_SETUP_TYPE,
+    SETUP_SOLAR_GRID,
     CONF_SOLAR_SENSOR,
     CONF_SOLAR_IS_ENERGY,
     CONF_GRID_SENSOR,
@@ -39,11 +40,6 @@ from .const import (
     RATE_MODE_TIERED,
     RATE_MODE_TOU,
     RATE_MODE_COMBINED,
-    ATTR_CYCLE_CONSUMPTION,
-    ATTR_DAYS_IN_CYCLE,
-    ATTR_DAYS_REMAINING,
-    ATTR_CURRENT_TIER,
-    ATTR_CURRENT_PERIOD,
 )
 from .calculations import (
     calc_tiered_cost as _calc_tiered_cost,
@@ -68,9 +64,9 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up sensors from a config entry."""
+    """Set up GridMetrics sensors."""
     config = {**entry.data, **entry.options}
-    name_prefix = entry.title or "Electricity"
+    name_prefix = entry.title or "GridMetrics"
 
     entities: list[SensorEntity] = [
         MarginalRateSensor(hass, entry, config, name_prefix),
@@ -82,15 +78,14 @@ async def async_setup_entry(
     if config.get(CONF_PREPAID_ENABLED):
         entities.append(PrepaidBalanceSensor(hass, entry, config, name_prefix))
 
-    # Solar / net-metering derived sensors
-    if config.get(CONF_HAS_SOLAR):
+    # Solar + grid derived sensors
+    if config.get(CONF_SETUP_TYPE) == SETUP_SOLAR_GRID or config.get("has_solar"):
         entities.extend(
             [
                 SolarProductionPowerSensor(hass, entry, config, name_prefix),
                 GridImportPowerSensor(hass, entry, config, name_prefix),
                 GridExportPowerSensor(hass, entry, config, name_prefix),
                 HomeConsumptionPowerSensor(hass, entry, config, name_prefix),
-                # Energy versions (kWh) for the Energy Dashboard
                 SolarProductionEnergySensor(hass, entry, config, name_prefix),
                 GridImportEnergySensor(hass, entry, config, name_prefix),
                 GridExportEnergySensor(hass, entry, config, name_prefix),
@@ -101,38 +96,25 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-# ---------------------------------------------------------------------------
-# Helpers to read live power from configured sensors
-# ---------------------------------------------------------------------------
-
 def _read_solar_power(hass: HomeAssistant, config: dict) -> float:
-    """Return current solar production in Watts (always >= 0)."""
     entity_id = config.get(CONF_SOLAR_SENSOR)
     if not entity_id:
         return 0.0
-    state = hass.states.get(entity_id)
-    val = _safe_float(state)
-    if val is None:
-        return 0.0
-    if config.get(CONF_SOLAR_IS_ENERGY):
-        # Cannot derive instantaneous power from cumulative energy alone
+    val = _safe_float(hass.states.get(entity_id))
+    if val is None or config.get(CONF_SOLAR_IS_ENERGY):
         return 0.0
     return max(0.0, val)
 
 
 def _read_grid_power(hass: HomeAssistant, config: dict) -> float:
-    """
-    Return signed grid power in Watts.
-    Convention after normalization: positive = import from grid, negative = export to grid.
-    """
+    """Signed grid power: positive = import, negative = export."""
     phases = config.get(CONF_GRID_PHASES) or []
     sign = config.get(CONF_GRID_SIGN, "positive_import")
 
     if phases:
         total = 0.0
         for eid in phases:
-            state = hass.states.get(eid)
-            val = _safe_float(state)
+            val = _safe_float(hass.states.get(eid))
             if val is not None:
                 total += val
         raw = total
@@ -140,21 +122,17 @@ def _read_grid_power(hass: HomeAssistant, config: dict) -> float:
         entity_id = config.get(CONF_GRID_SENSOR)
         if not entity_id:
             return 0.0
-        state = hass.states.get(entity_id)
-        val = _safe_float(state)
-        if val is None:
-            return 0.0
-        if config.get(CONF_GRID_IS_ENERGY):
+        val = _safe_float(hass.states.get(entity_id))
+        if val is None or config.get(CONF_GRID_IS_ENERGY):
             return 0.0
         raw = val
 
     if sign == "positive_export":
-        return -raw  # invert so positive becomes import
+        return -raw
     return raw
 
 
 def _tracked_entities(config: dict) -> list[str]:
-    """Entity IDs that should trigger an update of derived sensors."""
     entities = []
     if config.get(CONF_SOLAR_SENSOR):
         entities.append(config[CONF_SOLAR_SENSOR])
@@ -168,13 +146,7 @@ def _tracked_entities(config: dict) -> list[str]:
     return entities
 
 
-# ---------------------------------------------------------------------------
-# Solar-derived power sensors
-# ---------------------------------------------------------------------------
-
 class SolarBaseSensor(SensorEntity):
-    """Base for solar-derived sensors that listen to source entities."""
-
     _attr_has_entity_name = True
     _attr_should_poll = False
 
@@ -188,7 +160,7 @@ class SolarBaseSensor(SensorEntity):
             "name": name_prefix,
             "manufacturer": "GridMetrics",
             "model": "solar_net_metering",
-            "sw_version": "0.2.0",
+            "sw_version": "0.2.2",
         }
         self._unsub = None
 
@@ -210,8 +182,6 @@ class SolarBaseSensor(SensorEntity):
 
 
 class SolarProductionPowerSensor(SolarBaseSensor):
-    """Live solar production power (W)."""
-
     _attr_name = "Solar Production"
     _attr_device_class = SensorDeviceClass.POWER
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -224,8 +194,6 @@ class SolarProductionPowerSensor(SolarBaseSensor):
 
 
 class GridImportPowerSensor(SolarBaseSensor):
-    """Live grid import power (W) – only when drawing from the grid."""
-
     _attr_name = "Grid Import"
     _attr_device_class = SensorDeviceClass.POWER
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -234,13 +202,10 @@ class GridImportPowerSensor(SolarBaseSensor):
 
     @property
     def native_value(self) -> float:
-        grid = _read_grid_power(self.hass, self._config)
-        return round(max(0.0, grid), 1)
+        return round(max(0.0, _read_grid_power(self.hass, self._config)), 1)
 
 
 class GridExportPowerSensor(SolarBaseSensor):
-    """Live grid export power (W) – only when sending to the grid."""
-
     _attr_name = "Grid Export"
     _attr_device_class = SensorDeviceClass.POWER
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -249,19 +214,10 @@ class GridExportPowerSensor(SolarBaseSensor):
 
     @property
     def native_value(self) -> float:
-        grid = _read_grid_power(self.hass, self._config)
-        return round(max(0.0, -grid), 1)
+        return round(max(0.0, -_read_grid_power(self.hass, self._config)), 1)
 
 
 class HomeConsumptionPowerSensor(SolarBaseSensor):
-    """
-    Live home consumption power (W).
-
-    Formula (standard net-metering):
-        consumption = solar_production + grid_import - grid_export
-        which is equivalent to: solar + signed_grid   (when positive=import)
-    """
-
     _attr_name = "Home Consumption"
     _attr_device_class = SensorDeviceClass.POWER
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -271,8 +227,7 @@ class HomeConsumptionPowerSensor(SolarBaseSensor):
     @property
     def native_value(self) -> float:
         solar = _read_solar_power(self.hass, self._config)
-        grid = _read_grid_power(self.hass, self._config)  # +import / -export
-        # consumption = solar + import - export = solar + grid
+        grid = _read_grid_power(self.hass, self._config)
         return round(max(0.0, solar + grid), 1)
 
     @property
@@ -282,19 +237,11 @@ class HomeConsumptionPowerSensor(SolarBaseSensor):
         return {
             "solar_w": round(solar, 1),
             "grid_signed_w": round(grid, 1),
-            "formula": "solar_production + grid_import - grid_export",
+            "formula": "solar + grid_import - grid_export",
         }
 
 
-# ---------------------------------------------------------------------------
-# Energy sensors (kWh) – Riemann-style accumulation for the Energy Dashboard
-# These are simple cumulative counters updated from power; for production use
-# you can also point HA Energy Dashboard at these entities.
-# ---------------------------------------------------------------------------
-
 class _EnergyAccumulator(SolarBaseSensor):
-    """Base that keeps a running kWh total from power samples."""
-
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
@@ -309,11 +256,14 @@ class _EnergyAccumulator(SolarBaseSensor):
         now = dt_util.utcnow()
         if self._last_ts is not None and self._last_w is not None:
             hours = (now - self._last_ts).total_seconds() / 3600.0
-            # Trapezoidal
             avg_w = (self._last_w + power_w) / 2.0
             self._kwh += max(0.0, avg_w) * hours / 1000.0
         self._last_w = power_w
         self._last_ts = now
+        # Persist for cost sensors
+        data = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id)
+        if data is not None and isinstance(self, HomeConsumptionEnergySensor):
+            data["home_consumption_kwh"] = self._kwh
         return self._kwh
 
 
@@ -323,8 +273,7 @@ class SolarProductionEnergySensor(_EnergyAccumulator):
 
     @property
     def native_value(self) -> float:
-        w = _read_solar_power(self.hass, self._config)
-        return round(self._accumulate(w), 4)
+        return round(self._accumulate(_read_solar_power(self.hass, self._config)), 4)
 
 
 class GridImportEnergySensor(_EnergyAccumulator):
@@ -333,8 +282,8 @@ class GridImportEnergySensor(_EnergyAccumulator):
 
     @property
     def native_value(self) -> float:
-        grid = _read_grid_power(self.hass, self._config)
-        return round(self._accumulate(max(0.0, grid)), 4)
+        g = _read_grid_power(self.hass, self._config)
+        return round(self._accumulate(max(0.0, g)), 4)
 
 
 class GridExportEnergySensor(_EnergyAccumulator):
@@ -343,8 +292,8 @@ class GridExportEnergySensor(_EnergyAccumulator):
 
     @property
     def native_value(self) -> float:
-        grid = _read_grid_power(self.hass, self._config)
-        return round(self._accumulate(max(0.0, -grid)), 4)
+        g = _read_grid_power(self.hass, self._config)
+        return round(self._accumulate(max(0.0, -g)), 4)
 
 
 class HomeConsumptionEnergySensor(_EnergyAccumulator):
@@ -357,10 +306,6 @@ class HomeConsumptionEnergySensor(_EnergyAccumulator):
         grid = _read_grid_power(self.hass, self._config)
         return round(self._accumulate(max(0.0, solar + grid)), 4)
 
-
-# ---------------------------------------------------------------------------
-# Cost sensors (same as v0.1, with solar-aware source)
-# ---------------------------------------------------------------------------
 
 class BaseCostSensor(SensorEntity):
     _attr_has_entity_name = True
@@ -376,7 +321,7 @@ class BaseCostSensor(SensorEntity):
             "name": name_prefix,
             "manufacturer": "GridMetrics",
             "model": config.get(CONF_RATE_MODE, "tiered"),
-            "sw_version": "0.2.0",
+            "sw_version": "0.2.2",
         }
         self._source = config.get(CONF_SOURCE_SENSOR)
         self._unsub = None
@@ -400,22 +345,16 @@ class BaseCostSensor(SensorEntity):
         self.async_schedule_update_ha_state(True)
 
     def _get_source_kwh(self) -> float | None:
-        """Return cumulative kWh used for billing (home consumption)."""
-        if self._source == "derived_home_consumption" or self._config.get(CONF_HAS_SOLAR):
-            # Prefer the integration's own Home Consumption Energy entity if present
-            eid = f"sensor.{self._entry.title.lower().replace(' ', '_')}_home_consumption_energy"
-            # Fallback: look up by unique_id pattern via states is hard; use power-based estimate
-            # For cycle tracking we rely on the energy accumulator stored in hass.data
+        if self._source == "derived_home_consumption" or self._config.get(
+            CONF_SETUP_TYPE
+        ) == SETUP_SOLAR_GRID:
             data = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id, {})
             return data.get("home_consumption_kwh")
-
-        state = self.hass.states.get(self._source)
-        return _safe_float(state)
+        return _safe_float(self.hass.states.get(self._source))
 
     def _get_cycle_consumption(self) -> float:
         current = self._get_source_kwh()
         if current is None:
-            # Fallback for solar: use the live accumulator from the energy sensor class
             return 0.0
 
         data = self.hass.data[DOMAIN][self._entry.entry_id]
@@ -467,24 +406,11 @@ class MarginalRateSensor(BaseCostSensor):
             return round(marginal, 6)
         return None
 
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        mode = self._config.get(CONF_RATE_MODE, RATE_MODE_TIERED)
-        attrs = {"rate_mode": mode, "currency": self._config.get(CONF_CURRENCY, "USD")}
-        if mode in (RATE_MODE_TIERED, RATE_MODE_COMBINED):
-            _, _, tier = _calc_tiered_cost(
-                self._get_cycle_consumption(), self._config.get(CONF_TIERS, [])
-            )
-            attrs[ATTR_CURRENT_TIER] = tier
-        if mode in (RATE_MODE_TOU, RATE_MODE_COMBINED):
-            _, period = _get_current_tou_rate(self._config.get(CONF_TOU_PERIODS, []))
-            attrs[ATTR_CURRENT_PERIOD] = period
-        return attrs
-
 
 class EstimatedBillSensor(BaseCostSensor):
+    """Running estimated bill - no MONETARY device_class (HA compatibility)."""
+
     _attr_name = "Estimated Bill to Date"
-    _attr_device_class = SensorDeviceClass.MONETARY
     _attr_state_class = SensorStateClass.TOTAL
     _attr_icon = "mdi:receipt-text"
 
@@ -494,48 +420,30 @@ class EstimatedBillSensor(BaseCostSensor):
 
     @property
     def native_value(self) -> float | None:
-        consumption = self._get_cycle_consumption()
-        mode = self._config.get(CONF_RATE_MODE, RATE_MODE_TIERED)
-        fixed = float(self._config.get(CONF_FIXED_CHARGE, 0.0))
-        tax_pct = float(self._config.get(CONF_TAX_PERCENT, 0.0))
-        export_rate = float(self._config.get(CONF_EXPORT_RATE, 0.0))
+        try:
+            consumption = self._get_cycle_consumption()
+            mode = self._config.get(CONF_RATE_MODE, RATE_MODE_TIERED)
+            fixed = float(self._config.get(CONF_FIXED_CHARGE, 0.0) or 0.0)
+            tax_pct = float(self._config.get(CONF_TAX_PERCENT, 0.0) or 0.0)
 
-        energy_cost = 0.0
-        if mode == RATE_MODE_TIERED:
-            energy_cost, _, _ = _calc_tiered_cost(
-                consumption, self._config.get(CONF_TIERS, [])
-            )
-        elif mode == RATE_MODE_TOU:
-            rate, _ = _get_current_tou_rate(self._config.get(CONF_TOU_PERIODS, []))
-            energy_cost = consumption * rate
-        elif mode == RATE_MODE_COMBINED:
-            energy_cost, _, _ = _calc_tiered_cost(
-                consumption, self._config.get(CONF_TIERS, [])
-            )
+            energy_cost = 0.0
+            if mode == RATE_MODE_TIERED:
+                energy_cost, _, _ = _calc_tiered_cost(
+                    consumption, self._config.get(CONF_TIERS, [])
+                )
+            elif mode == RATE_MODE_TOU:
+                rate, _ = _get_current_tou_rate(self._config.get(CONF_TOU_PERIODS, []))
+                energy_cost = consumption * rate
+            elif mode == RATE_MODE_COMBINED:
+                energy_cost, _, _ = _calc_tiered_cost(
+                    consumption, self._config.get(CONF_TIERS, [])
+                )
 
-        # Credit for exported energy (if feed-in rate configured)
-        # Note: full accuracy needs separate export kWh tracking; v0.2 approximates
-        subtotal = energy_cost + fixed
-        total = subtotal * (1 + tax_pct / 100.0)
-        return round(total, 2)
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        consumption = self._get_cycle_consumption()
-        billing_day = self._config.get(CONF_BILLING_CYCLE_DAY, 1)
-        start, end = _get_cycle_bounds(billing_day)
-        now = dt_util.now()
-        days_in = max(1, (now - start).days + 1)
-        days_left = max(0, (end - now).days)
-        return {
-            ATTR_CYCLE_CONSUMPTION: round(consumption, 3),
-            ATTR_DAYS_IN_CYCLE: days_in,
-            ATTR_DAYS_REMAINING: days_left,
-            "fixed_charge": self._config.get(CONF_FIXED_CHARGE, 0.0),
-            "tax_percent": self._config.get(CONF_TAX_PERCENT, 0.0),
-            "export_rate": self._config.get(CONF_EXPORT_RATE, 0.0),
-            "currency": self._config.get(CONF_CURRENCY, "USD"),
-        }
+            subtotal = energy_cost + fixed
+            return round(subtotal * (1 + tax_pct / 100.0), 2)
+        except Exception as err:
+            _LOGGER.debug("Estimated bill calc error: %s", err)
+            return 0.0
 
 
 class CycleConsumptionSensor(BaseCostSensor):
@@ -551,8 +459,9 @@ class CycleConsumptionSensor(BaseCostSensor):
 
 
 class ForecastBillSensor(BaseCostSensor):
+    """Forecast bill - no MONETARY device_class (HA compatibility)."""
+
     _attr_name = "Forecast Bill"
-    _attr_device_class = SensorDeviceClass.MONETARY
     _attr_state_class = SensorStateClass.TOTAL
     _attr_icon = "mdi:chart-timeline-variant"
 
@@ -562,33 +471,36 @@ class ForecastBillSensor(BaseCostSensor):
 
     @property
     def native_value(self) -> float | None:
-        consumption = self._get_cycle_consumption()
-        billing_day = self._config.get(CONF_BILLING_CYCLE_DAY, 1)
-        start, end = _get_cycle_bounds(billing_day)
-        now = dt_util.now()
-        days_elapsed = max(1, (now - start).total_seconds() / 86400)
-        total_days = max(1, (end - start).total_seconds() / 86400)
-        projected_kwh = consumption * (total_days / days_elapsed)
+        try:
+            consumption = self._get_cycle_consumption()
+            billing_day = self._config.get(CONF_BILLING_CYCLE_DAY, 1)
+            start, end = _get_cycle_bounds(billing_day)
+            now = dt_util.now()
+            days_elapsed = max(1.0, (now - start).total_seconds() / 86400)
+            total_days = max(1.0, (end - start).total_seconds() / 86400)
+            projected_kwh = consumption * (total_days / days_elapsed)
 
-        mode = self._config.get(CONF_RATE_MODE, RATE_MODE_TIERED)
-        fixed = float(self._config.get(CONF_FIXED_CHARGE, 0.0))
-        tax_pct = float(self._config.get(CONF_TAX_PERCENT, 0.0))
+            mode = self._config.get(CONF_RATE_MODE, RATE_MODE_TIERED)
+            fixed = float(self._config.get(CONF_FIXED_CHARGE, 0.0) or 0.0)
+            tax_pct = float(self._config.get(CONF_TAX_PERCENT, 0.0) or 0.0)
 
-        if mode in (RATE_MODE_TIERED, RATE_MODE_COMBINED):
-            energy_cost, _, _ = _calc_tiered_cost(
-                projected_kwh, self._config.get(CONF_TIERS, [])
-            )
-        else:
-            rate, _ = _get_current_tou_rate(self._config.get(CONF_TOU_PERIODS, []))
-            energy_cost = projected_kwh * rate
+            if mode in (RATE_MODE_TIERED, RATE_MODE_COMBINED):
+                energy_cost, _, _ = _calc_tiered_cost(
+                    projected_kwh, self._config.get(CONF_TIERS, [])
+                )
+            else:
+                rate, _ = _get_current_tou_rate(self._config.get(CONF_TOU_PERIODS, []))
+                energy_cost = projected_kwh * rate
 
-        subtotal = energy_cost + fixed
-        return round(subtotal * (1 + tax_pct / 100.0), 2)
+            subtotal = energy_cost + fixed
+            return round(subtotal * (1 + tax_pct / 100.0), 2)
+        except Exception as err:
+            _LOGGER.debug("Forecast bill calc error: %s", err)
+            return 0.0
 
 
 class PrepaidBalanceSensor(BaseCostSensor):
     _attr_name = "Prepaid Balance"
-    _attr_device_class = SensorDeviceClass.MONETARY
     _attr_state_class = SensorStateClass.TOTAL
     _attr_icon = "mdi:wallet"
 
@@ -600,10 +512,3 @@ class PrepaidBalanceSensor(BaseCostSensor):
     def native_value(self) -> float | None:
         data = self.hass.data[DOMAIN][self._entry.entry_id]
         return round(data.get("prepaid_balance", 0.0), 2)
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        return {
-            "note": "Use service gridmetrics.set_prepaid_balance or add_prepaid_credit after buying power",
-            "currency": self._config.get(CONF_CURRENCY, "USD"),
-        }
