@@ -1,4 +1,4 @@
-"""Tiered / Time-of-Use Electricity Rate Calculator for Home Assistant."""
+"""GridMetrics for Home Assistant."""
 
 from __future__ import annotations
 
@@ -36,10 +36,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Register services once
     if not hass.services.has_service(DOMAIN, SERVICE_ADD_PREPAID):
         async def handle_add_prepaid(call: ServiceCall) -> None:
-            """Add credit to prepaid balance (Aruba / Caribbean style)."""
             amount = call.data.get("amount", 0.0)
             entry_id = call.data.get("entry_id")
             if entry_id and entry_id in hass.data[DOMAIN]:
@@ -51,7 +49,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     entry_id,
                     data["prepaid_balance"],
                 )
-                # Fire event for notifications / automations
                 hass.bus.async_fire(
                     f"{DOMAIN}_prepaid_topup",
                     {
@@ -62,14 +59,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 )
 
         async def handle_reset_cycle(call: ServiceCall) -> None:
-            """Manually reset the billing cycle tracking."""
             entry_id = call.data.get("entry_id")
             if entry_id and entry_id in hass.data[DOMAIN]:
                 hass.data[DOMAIN][entry_id]["cycle_start_kwh"] = None
                 _LOGGER.info("Billing cycle reset for %s", entry_id)
 
         async def handle_set_balance(call: ServiceCall) -> None:
-            """Set absolute prepaid balance (after buying power)."""
             amount = call.data.get("amount", 0.0)
             entry_id = call.data.get("entry_id")
             if entry_id and entry_id in hass.data[DOMAIN]:
@@ -129,3 +124,11 @@ async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload config entry when options change."""
     await async_unload_entry(hass, entry)
     await async_setup_entry(hass, entry)
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate config entry from older versions."""
+    _LOGGER.info("Migrating GridMetrics config entry from version %s", entry.version)
+    if entry.version < 2:
+        hass.config_entries.async_update_entry(entry, version=2)
+    return True
