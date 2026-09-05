@@ -1,6 +1,6 @@
 # Tiered / Time-of-Use Electricity Rate Calculator
 
-**HACS custom integration for Home Assistant – v0.2.0**
+**HACS custom integration for Home Assistant – v0.2.1**
 
 Calculate accurate electricity costs for **fixed-rate tiered (block) and/or Time-of-Use plans**, with **easy solar / net-metering onboarding**.
 
@@ -59,9 +59,10 @@ You get ready-to-use sensors for the Energy Dashboard and for the cost engine.
 2. Add Integration → **Tiered / Time-of-Use Electricity Rate Calculator**.
 3. Fill name, rate mode, **currency** (e.g. AWG), fixed charge, tax.
 4. Enable **I have solar panels**.
-5. Solar step:
-   - Solar sensor → your Enphase production (prefer **W**)
-   - Multi-phase → `sensor.shelly_phase_a_power,sensor.shelly_phase_b_power,sensor.shelly_phase_c_power`
+5. Solar steps (guided):
+   - **Solar production** → pick your Enphase (or other) power sensor
+   - **Grid type** → “Multiple phases” (Shelly 3EM) or “One single grid sensor”
+   - **Phases** → pick Phase A / B / C separately (leave unused empty)
    - Sign → usually “Positive = Import from grid”
    - Optional feed-in rate
 6. Enter your tiers / TOU windows.

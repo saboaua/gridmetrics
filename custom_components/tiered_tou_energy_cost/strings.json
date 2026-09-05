@@ -2,49 +2,73 @@
   "config": {
     "step": {
       "user": {
-        "title": "Tiered / TOU Electricity Rate Calculator",
-        "description": "Configure your fixed-rate electricity plan. Designed for North America, Caribbean, Latin America, Asia & Africa.\n\nTurn on **Has solar panels** if you have solar (Enphase, etc.) and a grid meter (Shelly 3EM, etc.). The integration will create Home Consumption, Grid Import/Export and Solar Production sensors automatically.",
+        "title": "Step 1 – Basics",
+        "description": "Name your setup, choose how your utility bills you, pick your currency, and tell us if you have solar panels.\n\nIf you have solar (Enphase, SolarEdge, etc.) and a grid meter (Shelly 3EM, etc.), turn on **I have solar panels**. We will create Home Consumption, Grid Import/Export and Solar Production sensors for you automatically.",
         "data": {
-          "name": "Name",
-          "rate_mode": "Rate structure",
-          "currency": "Currency",
-          "billing_cycle_day": "Billing cycle start day (1-28)",
-          "fixed_charge": "Monthly fixed / access charge",
-          "tax_percent": "Tax / GCT / IVA percent",
-          "prepaid_enabled": "Enable prepaid balance tracking",
+          "name": "Name for this setup",
+          "rate_mode": "How does your utility charge you?",
+          "currency": "Currency shown on bills and sensors",
+          "billing_cycle_day": "Day of the month your billing cycle starts (1–28)",
+          "fixed_charge": "Monthly fixed / access charge (0 if none)",
+          "tax_percent": "Tax / GCT / IVA percent (0 if none)",
+          "prepaid_enabled": "I use a prepaid meter (buy credit in advance)",
           "has_solar": "I have solar panels (create net-metering sensors)"
         }
       },
-      "solar": {
-        "title": "Solar & Grid sensors",
-        "description": "Point to your existing sensors. The integration will calculate Home Consumption for you.\n\n**Solar sensor**: Enphase production (prefer power in W).\n**Grid sensor**: single net power from your meter, OR leave empty and fill multi-phase.\n**Multi-phase (Shelly 3EM)**: comma-separated entity IDs, e.g.\nsensor.shelly_phase_a_power,sensor.shelly_phase_b_power,sensor.shelly_phase_c_power\n\nExample from your graph: Solar 5414 W, Grid exporting 3849 W → Home Consumption ≈ 1565 W.",
+      "solar_production": {
+        "title": "Step 2 – Solar production",
+        "description": "Select the sensor that shows how much power your solar panels are producing right now.\n\nPrefer a **power** sensor in Watts (W). Enphase, SolarEdge and most inverters provide this.\n\nOnly tick the checkbox below if you only have a cumulative kWh energy sensor.",
         "data": {
           "solar_sensor": "Solar production sensor",
-          "solar_is_energy": "Solar sensor is cumulative energy (kWh) instead of power (W)",
-          "grid_sensor": "Grid net power/energy sensor (optional if using phases)",
-          "grid_phases_raw": "Multi-phase grid sensors (comma-separated, optional)",
-          "grid_is_energy": "Grid sensor is cumulative energy (kWh) instead of power (W)",
-          "grid_sign": "Grid sensor sign convention",
-          "export_rate": "Feed-in / export rate (currency per kWh, 0 = none)"
+          "solar_is_energy": "This sensor is cumulative energy (kWh), not live power (W)"
+        }
+      },
+      "grid_type": {
+        "title": "Step 3 – How is your grid measured?",
+        "description": "Choose how your electricity meter reports power to Home Assistant.\n\n• **Multiple phases** – you have separate sensors for phase A, B and/or C (typical with Shelly 3EM).\n• **One single grid sensor** – one entity already shows net import/export for the whole house.",
+        "data": {
+          "grid_setup_type": "Grid meter type"
+        }
+      },
+      "grid_phases": {
+        "title": "Step 4 – Phase sensors (Shelly 3EM style)",
+        "description": "Pick each phase power sensor you have. You can fill 1, 2 or all 3 – leave unused phases empty.\n\nExample for Shelly 3EM:\n• Phase A → sensor.shelly_3em_channel_a_power\n• Phase B → sensor.shelly_3em_channel_b_power\n• Phase C → sensor.shelly_3em_channel_c_power\n\nThe integration will add them together to get total grid power.\n\nThen choose the sign convention (most meters: positive = importing from the grid).",
+        "data": {
+          "phase_a": "Phase A power sensor (optional)",
+          "phase_b": "Phase B power sensor (optional)",
+          "phase_c": "Phase C power sensor (optional)",
+          "grid_is_energy": "These sensors are cumulative energy (kWh), not live power (W)",
+          "grid_sign": "What does a positive number mean?",
+          "export_rate": "Feed-in / export credit per kWh (0 if you get nothing for export)"
+        }
+      },
+      "grid_single": {
+        "title": "Step 4 – Single grid sensor",
+        "description": "Select the one sensor that shows net power to/from the grid for your whole house.\n\nThen choose the sign convention (most meters: positive = importing from the grid).",
+        "data": {
+          "grid_sensor": "Grid net power / energy sensor",
+          "grid_is_energy": "This sensor is cumulative energy (kWh), not live power (W)",
+          "grid_sign": "What does a positive number mean?",
+          "export_rate": "Feed-in / export credit per kWh (0 if you get nothing for export)"
         }
       },
       "source": {
         "title": "Energy source sensor",
-        "description": "Select the cumulative energy sensor (kWh) that represents what you are billed for.",
+        "description": "Select the cumulative energy sensor (kWh) that represents what you are billed for (total house consumption).",
         "data": {
           "source_sensor": "Energy source sensor (kWh total)"
         }
       },
       "tiers": {
-        "title": "Consumption Tiers (Increasing Block)",
-        "description": "Enter tiers as max_kWh:rate pairs, comma-separated.\nAruba Elmar example: 500:0.3431,1000:0.3531,99999:0.4645\nMexico CFE-style: 75:1.12,140:1.37,99999:4.00",
+        "title": "Consumption tiers (increasing block)",
+        "description": "Enter your utility’s block rates as: max_kWh:price, max_kWh:price, …\n\nAruba (Elmar) example:\n500:0.3431,1000:0.3531,99999:0.4645\n\nMexico CFE-style example:\n75:1.12,140:1.37,99999:4.00\n\nUse a very high number (e.g. 99999) for the last tier.",
         "data": {
-          "tiers_raw": "Tiers (max_kWh:rate, ...)"
+          "tiers_raw": "Tiers (max_kWh:rate, max_kWh:rate, …)"
         }
       },
       "tou": {
-        "title": "Time-of-Use Periods",
-        "description": "Enter periods as name|start|end|rate|weekdays_only separated by semicolons.\nJamaica JPS example: peak|18:00|22:00|0.35|true;partial|06:00|18:00|0.28|true;offpeak|22:00|06:00|0.22|false",
+        "title": "Time-of-Use periods",
+        "description": "Enter periods as:\nname|start|end|rate|weekdays_only\nseparated by semicolons.\n\nJamaica (JPS) example:\npeak|18:00|22:00|0.35|true;partial|06:00|18:00|0.28|true;offpeak|22:00|06:00|0.22|false\n\nweekdays_only = true means the period only applies Mon–Fri.",
         "data": {
           "tou_raw": "TOU periods"
         }
@@ -52,7 +76,8 @@
     },
     "error": {
       "invalid_tiers": "Could not parse tiers. Use format: 200:0.25,500:0.32,99999:0.41",
-      "invalid_tou": "Could not parse TOU periods. Use format: name|HH:MM|HH:MM|rate|true/false;..."
+      "invalid_tou": "Could not parse TOU periods. Use format: name|HH:MM|HH:MM|rate|true/false;...",
+      "need_one_phase": "Please select at least one phase sensor (A, B or C)."
     },
     "abort": {
       "already_configured": "This energy sensor is already configured"

@@ -1,12 +1,16 @@
 {
   "domain": "tiered_tou_energy_cost",
   "name": "Tiered / Time-of-Use Electricity Rate Calculator",
-  "codeowners": ["@your-github-handle"],
+  "codeowners": [
+    "@your-github-handle"
+  ],
   "config_flow": true,
-  "dependencies": ["energy"],
+  "dependencies": [
+    "energy"
+  ],
   "documentation": "https://github.com/your-github-handle/ha-tiered-tou-energy-cost",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/your-github-handle/ha-tiered-tou-energy-cost/issues",
   "requirements": [],
-  "version": "0.2.0"
+  "version": "0.2.1"
 }
