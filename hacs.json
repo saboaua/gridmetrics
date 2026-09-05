@@ -1,0 +1,9 @@
+{
+  "name": "Tiered / Time-of-Use Electricity Rate Calculator",
+  "content_in_root": false,
+  "filename": "tiered_tou_energy_cost.zip",
+  "render_readme": true,
+  "domains": ["sensor"],
+  "homeassistant": "2024.1.0",
+  "iot_class": "Local Polling"
+}

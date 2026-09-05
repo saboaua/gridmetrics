@@ -1,0 +1,53 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Tiered / TOU Electricity Rate Calculator",
+        "description": "Configure your fixed-rate electricity plan (tiered, time-of-use, or both). Designed for North America, Caribbean, Latin America, Asia & Africa utilities.",
+        "data": {
+          "name": "Name",
+          "source_sensor": "Energy source sensor (kWh total)",
+          "rate_mode": "Rate structure",
+          "currency": "Currency code (USD, AWG, MXN, JMD...)",
+          "billing_cycle_day": "Billing cycle start day (1-28)",
+          "fixed_charge": "Monthly fixed / access charge",
+          "tax_percent": "Tax / GCT / IVA percent",
+          "prepaid_enabled": "Enable prepaid balance tracking"
+        }
+      },
+      "tiers": {
+        "title": "Consumption Tiers (Increasing Block)",
+        "description": "Enter tiers as max_kWh:rate pairs, comma-separated.\nExample for Aruba Elmar: 500:0.3431,1000:0.3531,99999:0.4645\nExample for Mexico CFE-style: 75:1.12,140:1.37,99999:4.00",
+        "data": {
+          "tiers_raw": "Tiers (max_kWh:rate, ...)"
+        }
+      },
+      "tou": {
+        "title": "Time-of-Use Periods",
+        "description": "Enter periods as name|start|end|rate|weekdays_only separated by semicolons.\nExample (Jamaica JPS style): peak|18:00|22:00|0.35|true;partial|06:00|18:00|0.28|true;offpeak|22:00|06:00|0.22|false",
+        "data": {
+          "tou_raw": "TOU periods"
+        }
+      }
+    },
+    "error": {
+      "invalid_tiers": "Could not parse tiers. Use format: 200:0.25,500:0.32,99999:0.41",
+      "invalid_tou": "Could not parse TOU periods. Use format: name|HH:MM|HH:MM|rate|true/false;..."
+    },
+    "abort": {
+      "already_configured": "This energy sensor is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Update charges & cycle",
+        "data": {
+          "fixed_charge": "Monthly fixed / access charge",
+          "tax_percent": "Tax percent",
+          "billing_cycle_day": "Billing cycle start day"
+        }
+      }
+    }
+  }
+}
