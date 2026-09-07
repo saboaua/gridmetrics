@@ -1,4 +1,4 @@
-"""GridMetrics for Home Assistant."""
+"""Tiered / Time-of-Use Electricity Rate Calculator for Home Assistant."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from .const import (
     DOMAIN,
     CONF_PREPAID_ENABLED,
     CONF_PREPAID_BALANCE,
+    CONFIG_ENTRY_VERSION,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -22,6 +23,40 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 SERVICE_ADD_PREPAID = "add_prepaid_credit"
 SERVICE_RESET_CYCLE = "reset_billing_cycle"
 SERVICE_SET_BALANCE = "set_prepaid_balance"
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate an old config entry to the current version.
+
+    No stored data fields have changed between versions to date, so
+    this only needs to bump the stamped version number. Keep this
+    function around (and add real field migrations here) any time
+    VERSION is bumped in config_flow.py, so existing entries never
+    get stuck showing the "higher than current version" repair error.
+    """
+    if entry.version > CONFIG_ENTRY_VERSION:
+        # Entry is newer than this installed code supports; refuse cleanly.
+        _LOGGER.error(
+            "GridMetrics entry '%s' has version %s, newer than supported version %s. "
+            "Update the integration before loading this entry.",
+            entry.title,
+            entry.version,
+            CONFIG_ENTRY_VERSION,
+        )
+        return False
+
+    if entry.version < CONFIG_ENTRY_VERSION:
+        _LOGGER.info(
+            "Migrating GridMetrics entry '%s' from version %s to %s",
+            entry.title,
+            entry.version,
+            CONFIG_ENTRY_VERSION,
+        )
+        hass.config_entries.async_update_entry(
+            entry, data={**entry.data}, version=CONFIG_ENTRY_VERSION
+        )
+
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -36,8 +71,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    # Register services once
     if not hass.services.has_service(DOMAIN, SERVICE_ADD_PREPAID):
         async def handle_add_prepaid(call: ServiceCall) -> None:
+            """Add credit to prepaid balance (Aruba / Caribbean style)."""
             amount = call.data.get("amount", 0.0)
             entry_id = call.data.get("entry_id")
             if entry_id and entry_id in hass.data[DOMAIN]:
@@ -49,6 +86,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     entry_id,
                     data["prepaid_balance"],
                 )
+                # Fire event for notifications / automations
                 hass.bus.async_fire(
                     f"{DOMAIN}_prepaid_topup",
                     {
@@ -59,12 +97,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 )
 
         async def handle_reset_cycle(call: ServiceCall) -> None:
+            """Manually reset the billing cycle tracking."""
             entry_id = call.data.get("entry_id")
             if entry_id and entry_id in hass.data[DOMAIN]:
                 hass.data[DOMAIN][entry_id]["cycle_start_kwh"] = None
                 _LOGGER.info("Billing cycle reset for %s", entry_id)
 
         async def handle_set_balance(call: ServiceCall) -> None:
+            """Set absolute prepaid balance (after buying power)."""
             amount = call.data.get("amount", 0.0)
             entry_id = call.data.get("entry_id")
             if entry_id and entry_id in hass.data[DOMAIN]:
@@ -124,11 +164,3 @@ async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload config entry when options change."""
     await async_unload_entry(hass, entry)
     await async_setup_entry(hass, entry)
-
-
-async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Migrate config entry from older versions."""
-    _LOGGER.info("Migrating GridMetrics config entry from version %s", entry.version)
-    if entry.version < 2:
-        hass.config_entries.async_update_entry(entry, version=2)
-    return True

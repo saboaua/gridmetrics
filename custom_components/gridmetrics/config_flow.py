@@ -10,6 +10,7 @@ from homeassistant.const import CONF_NAME
 
 from .const import (
     DOMAIN,
+    CONFIG_ENTRY_VERSION,
     CONF_SOURCE_SENSOR,
     CONF_CURRENCY,
     CONF_BILLING_CYCLE_DAY,
@@ -48,7 +49,7 @@ from .const import (
 class GridMetricsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Config flow for GridMetrics."""
 
-    VERSION = 1
+    VERSION = CONFIG_ENTRY_VERSION
 
     def __init__(self) -> None:
         self._data: dict = {}
@@ -149,7 +150,9 @@ class GridMetricsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         schema = vol.Schema(
             {
                 vol.Required(CONF_SOLAR_SENSOR): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor")
+                    selector.EntitySelectorConfig(
+                        domain="sensor", device_class=["power", "energy"]
+                    )
                 ),
                 vol.Required(CONF_SOLAR_IS_ENERGY, default=False): bool,
             }
@@ -224,7 +227,11 @@ class GridMetricsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     def _phases_schema(self):
-        ent = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
+        ent = selector.EntitySelector(
+            selector.EntitySelectorConfig(
+                domain="sensor", device_class=["power", "energy"]
+            )
+        )
         return vol.Schema(
             {
                 vol.Optional("phase_a"): ent,
@@ -272,7 +279,9 @@ class GridMetricsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         schema = vol.Schema(
             {
                 vol.Required(CONF_GRID_SENSOR): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor")
+                    selector.EntitySelectorConfig(
+                        domain="sensor", device_class=["power", "energy"]
+                    )
                 ),
                 vol.Required(CONF_GRID_IS_ENERGY, default=False): bool,
                 vol.Required(
@@ -311,7 +320,9 @@ class GridMetricsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         schema = vol.Schema(
             {
                 vol.Required(CONF_SOURCE_SENSOR): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor")
+                    selector.EntitySelectorConfig(
+                        domain="sensor", device_class="energy"
+                    )
                 ),
             }
         )

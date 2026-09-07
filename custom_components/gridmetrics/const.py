@@ -3,6 +3,13 @@
 DOMAIN = "gridmetrics"
 VERSION = "0.2.3"
 
+# Config entry schema version (HA config_entries versioning, NOT the
+# integration release version above). Bump this in lockstep with
+# GridMetricsConfigFlow.VERSION in config_flow.py whenever the stored
+# entry.data schema changes, and add a real migration step in
+# __init__.async_migrate_entry for that bump.
+CONFIG_ENTRY_VERSION = 2
+
 CONF_SOURCE_SENSOR = "source_sensor"
 CONF_CURRENCY = "currency"
 CONF_BILLING_CYCLE_DAY = "billing_cycle_day"

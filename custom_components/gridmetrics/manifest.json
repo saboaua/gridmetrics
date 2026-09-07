@@ -1,12 +1,12 @@
 {
   "domain": "gridmetrics",
   "name": "GridMetrics",
-  "codeowners": ["@saboaua"],
+  "codeowners": ["@your-github-handle"],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/saboaua/gridmetrics",
+  "documentation": "https://github.com/your-github-handle/ha-gridmetrics",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/saboaua/gridmetrics/issues",
+  "issue_tracker": "https://github.com/your-github-handle/ha-gridmetrics/issues",
   "requirements": [],
   "version": "0.2.3"
 }
