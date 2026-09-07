@@ -1,16 +1,16 @@
-<p align="center">
-  <img src="custom_components/gridmetrics/brand/logo.png" alt="GridMetrics" width="480">
-</p>
+<div align="center">
 
-<p align="center">
+![GridMetrics](https://raw.githubusercontent.com/saboaua/gridmetrics/main/custom_components/gridmetrics/brand/logo.png)
+
 Tiered / Time-of-Use Electricity Rate Calculator for Home Assistant
-</p>
 
-[![release](https://img.shields.io/badge/release-v0.2.4-2c3e50)](https://github.com/your-github-handle/ha-gridmetrics/releases)
+[![release](https://img.shields.io/badge/release-v0.2.4-2c3e50)](https://github.com/saboaua/gridmetrics/releases)
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange)](https://hacs.xyz)
 [![HA](https://img.shields.io/badge/HA-2024.1%2B-41BDF5)](https://www.home-assistant.io)
 [![Buy Me a Coffee](https://img.shields.io/badge/%E2%98%95-Buy%20me%20a%20coffee-FF813F)](https://ko-fi.com/patrickgfortin)
-[![issues](https://img.shields.io/github/issues/your-github-handle/ha-gridmetrics)](https://github.com/your-github-handle/ha-gridmetrics/issues)
+[![issues](https://img.shields.io/github/issues/saboaua/gridmetrics)](https://github.com/saboaua/gridmetrics/issues)
+
+</div>
 
 Calculate accurate electricity costs for **fixed-rate tiered (block) and/or Time-of-Use plans**, with **guided solar / net-metering onboarding**.
 
