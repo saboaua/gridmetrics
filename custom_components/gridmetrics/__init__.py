@@ -157,10 +157,26 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id, None)
+    else:
+        _LOGGER.error(
+            "GridMetrics entry '%s' failed to unload cleanly; refusing to "
+            "re-setup to avoid a duplicate-platform crash loop",
+            entry.title,
+        )
     return unload_ok
 
 
 async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Reload config entry when options change."""
-    await async_unload_entry(hass, entry)
-    await async_setup_entry(hass, entry)
+    """Reload config entry when options change.
+
+    Uses hass.config_entries.async_reload() rather than a hand-rolled
+    unload-then-setup: the built-in helper holds a per-entry lock so an
+    options save can't overlap with another in-flight reload, and it
+    won't call async_setup_entry again if unload didn't actually
+    succeed. Calling async_setup_entry after a failed unload is what
+    was driving the "options save spins forever" symptom - the sensor
+    platform was still registered from the previous load, so forwarding
+    entry setup a second time raised, and the frontend never got a
+    completion response for the options dialog.
+    """
+    await hass.config_entries.async_reload(entry.entry_id)

@@ -357,7 +357,13 @@ class BaseCostSensor(SensorEntity):
         if current is None:
             return 0.0
 
-        data = self.hass.data[DOMAIN][self._entry.entry_id]
+        data = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id)
+        if data is None:
+            # Entry is mid-reload (e.g. options were just saved) and
+            # hasn't repopulated hass.data yet - report 0 instead of
+            # raising, so a burst of source-sensor updates during the
+            # reload window can't hammer the logger with KeyErrors.
+            return 0.0
         start_kwh = data.get("cycle_start_kwh")
         billing_day = self._config.get(CONF_BILLING_CYCLE_DAY, 1)
         cycle_start, _ = _get_cycle_bounds(billing_day)
@@ -510,5 +516,5 @@ class PrepaidBalanceSensor(BaseCostSensor):
 
     @property
     def native_value(self) -> float | None:
-        data = self.hass.data[DOMAIN][self._entry.entry_id]
+        data = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id, {})
         return round(data.get("prepaid_balance", 0.0), 2)

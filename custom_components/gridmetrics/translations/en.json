@@ -1,0 +1,119 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "GridMetrics setup",
+        "description": "Tiered / Time-of-Use Electricity Rate Calculator.\n\nChoose how your home is metered. Pick **Solar + Grid** if you have solar panels (Enphase, etc.) and a grid meter (Shelly 3EM, etc.).",
+        "data": {
+          "setup_type": "What do you want to set up?"
+        }
+      },
+      "basics": {
+        "title": "Basics (Solar + Grid)",
+        "description": "Name, billing style, currency and fixed charges.",
+        "data": {
+          "name": "Name for this setup",
+          "rate_mode": "How does your utility charge you?",
+          "currency": "Currency",
+          "billing_cycle_day": "Billing cycle start day (1-28)",
+          "fixed_charge": "Monthly fixed / access charge (0 if none)",
+          "tax_percent": "Tax percent (0 if none)",
+          "prepaid_enabled": "I use a prepaid meter"
+        }
+      },
+      "basics_grid_only": {
+        "title": "Basics (Grid only)",
+        "description": "Name, billing style, currency and fixed charges.",
+        "data": {
+          "name": "Name for this setup",
+          "rate_mode": "How does your utility charge you?",
+          "currency": "Currency",
+          "billing_cycle_day": "Billing cycle start day (1-28)",
+          "fixed_charge": "Monthly fixed / access charge (0 if none)",
+          "tax_percent": "Tax percent (0 if none)",
+          "prepaid_enabled": "I use a prepaid meter"
+        }
+      },
+      "solar_production": {
+        "title": "Solar production sensor",
+        "description": "Select the sensor that shows live solar production. Prefer power in Watts (W) from Enphase or your inverter.",
+        "data": {
+          "solar_sensor": "Solar production sensor",
+          "solar_is_energy": "This sensor is cumulative kWh (not live Watts)"
+        }
+      },
+      "grid_type": {
+        "title": "How is the grid measured?",
+        "description": "Shelly 3EM and similar meters report each phase separately. Choose multiple phases to pick Phase A, B and C on the next screen.",
+        "data": {
+          "grid_setup_type": "Grid meter type"
+        }
+      },
+      "grid_phases": {
+        "title": "Grid phase sensors",
+        "description": "Pick Phase A, B and/or C power sensors. Leave unused phases empty. At least one is required.\n\nExample Shelly 3EM:\nPhase A = channel_a_power\nPhase B = channel_b_power\nPhase C = channel_c_power",
+        "data": {
+          "phase_a": "Phase A power sensor",
+          "phase_b": "Phase B power sensor",
+          "phase_c": "Phase C power sensor",
+          "grid_is_energy": "These are cumulative kWh sensors (not live Watts)",
+          "grid_sign": "What does a positive number mean?",
+          "export_rate": "Feed-in credit per kWh (0 if none)"
+        }
+      },
+      "grid_single": {
+        "title": "Single grid sensor",
+        "description": "Select the one sensor that shows net power to/from the grid.",
+        "data": {
+          "grid_sensor": "Grid net power sensor",
+          "grid_is_energy": "This is a cumulative kWh sensor (not live Watts)",
+          "grid_sign": "What does a positive number mean?",
+          "export_rate": "Feed-in credit per kWh (0 if none)"
+        }
+      },
+      "source": {
+        "title": "Billed energy sensor",
+        "description": "Select the cumulative energy sensor (kWh) that matches what your utility bills you for. This is usually total grid import energy, not a power (W) sensor.",
+        "data": {
+          "source_sensor": "Energy sensor (kWh) used for billing"
+        }
+      },
+      "tiers": {
+        "title": "Consumption tiers",
+        "description": "Format: max_kWh:price, max_kWh:price, ...\n\nAruba Elmar example:\n500:0.3431,1000:0.3531,99999:0.4645",
+        "data": {
+          "tiers_raw": "Tiers (max_kWh:rate, ...)"
+        }
+      },
+      "tou": {
+        "title": "Time-of-Use periods",
+        "description": "Format: name|start|end|rate|weekdays_only separated by semicolons.\n\nExample:\npeak|18:00|22:00|0.35|true;offpeak|22:00|06:00|0.22|false",
+        "data": {
+          "tou_raw": "TOU periods"
+        }
+      }
+    },
+    "error": {
+      "invalid_tiers": "Could not parse tiers. Use: 200:0.25,500:0.32,99999:0.41",
+      "invalid_tou": "Could not parse TOU. Use: name|HH:MM|HH:MM|rate|true/false;...",
+      "need_one_phase": "Select at least one phase sensor (A, B or C)."
+    },
+    "abort": {
+      "already_configured": "Already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Update GridMetrics settings",
+        "data": {
+          "fixed_charge": "Monthly fixed charge",
+          "tax_percent": "Tax percent",
+          "billing_cycle_day": "Billing cycle start day",
+          "export_rate": "Feed-in rate",
+          "currency": "Currency"
+        }
+      }
+    }
+  }
+}
