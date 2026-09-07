@@ -7,6 +7,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.storage import Store
+from homeassistant.util import dt as dt_util
 import voluptuous as vol
 
 from .const import (
@@ -23,6 +25,36 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 SERVICE_ADD_PREPAID = "add_prepaid_credit"
 SERVICE_RESET_CYCLE = "reset_billing_cycle"
 SERVICE_SET_BALANCE = "set_prepaid_balance"
+
+STORAGE_VERSION = 1
+
+
+def async_save_cycle_state(hass: HomeAssistant, entry_id: str) -> None:
+    """Persist cycle_start_kwh / last_cycle_start / prepaid_balance to disk.
+
+    These previously lived only in hass.data, which is rebuilt from
+    scratch (cycle_start_kwh reset to None) on every setup - including
+    every HA restart and every reload triggered by an Options save.
+    That silently threw away billing-cycle progress and prepaid
+    balance on a routine basis. Fire-and-forget task; called after
+    every change to those values so a crash mid-write can't corrupt
+    in-memory state, only lose the last unsaved write.
+    """
+    data = hass.data.get(DOMAIN, {}).get(entry_id)
+    if data is None:
+        return
+    store: Store | None = data.get("cycle_store")
+    if store is None:
+        return
+    last_cycle_start = data.get("last_cycle_start")
+    payload = {
+        "cycle_start_kwh": data.get("cycle_start_kwh"),
+        "last_cycle_start": (
+            last_cycle_start.isoformat() if last_cycle_start else None
+        ),
+        "prepaid_balance": data.get("prepaid_balance", 0.0),
+    }
+    hass.async_create_task(store.async_save(payload))
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -62,11 +94,23 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up GridMetrics from a config entry."""
     hass.data.setdefault(DOMAIN, {})
+
+    store = Store(hass, STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_cycle")
+    saved = await store.async_load() or {}
+
+    last_cycle_start = saved.get("last_cycle_start")
+    if last_cycle_start:
+        last_cycle_start = dt_util.parse_datetime(last_cycle_start)
+
     hass.data[DOMAIN][entry.entry_id] = {
         "config": entry.data,
         "options": entry.options,
-        "cycle_start_kwh": None,
-        "prepaid_balance": entry.data.get(CONF_PREPAID_BALANCE, 0.0),
+        "cycle_start_kwh": saved.get("cycle_start_kwh"),
+        "last_cycle_start": last_cycle_start,
+        "prepaid_balance": saved.get(
+            "prepaid_balance", entry.data.get(CONF_PREPAID_BALANCE, 0.0)
+        ),
+        "cycle_store": store,
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -80,6 +124,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             if entry_id and entry_id in hass.data[DOMAIN]:
                 data = hass.data[DOMAIN][entry_id]
                 data["prepaid_balance"] = data.get("prepaid_balance", 0.0) + amount
+                async_save_cycle_state(hass, entry_id)
                 _LOGGER.info(
                     "Added %.2f to prepaid balance for %s. New balance: %.2f",
                     amount,
@@ -101,6 +146,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             entry_id = call.data.get("entry_id")
             if entry_id and entry_id in hass.data[DOMAIN]:
                 hass.data[DOMAIN][entry_id]["cycle_start_kwh"] = None
+                hass.data[DOMAIN][entry_id]["last_cycle_start"] = None
+                async_save_cycle_state(hass, entry_id)
                 _LOGGER.info("Billing cycle reset for %s", entry_id)
 
         async def handle_set_balance(call: ServiceCall) -> None:
@@ -109,6 +156,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             entry_id = call.data.get("entry_id")
             if entry_id and entry_id in hass.data[DOMAIN]:
                 hass.data[DOMAIN][entry_id]["prepaid_balance"] = amount
+                async_save_cycle_state(hass, entry_id)
                 hass.bus.async_fire(
                     f"{DOMAIN}_prepaid_topup",
                     {

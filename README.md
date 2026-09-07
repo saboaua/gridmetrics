@@ -4,7 +4,7 @@
 
 Tiered / Time-of-Use Electricity Rate Calculator for Home Assistant
 
-[![release](https://img.shields.io/badge/release-v0.2.7-2c3e50)](https://github.com/saboaua/gridmetrics/releases)
+[![release](https://img.shields.io/badge/release-v0.2.8-2c3e50)](https://github.com/saboaua/gridmetrics/releases)
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange)](https://hacs.xyz)
 [![HA](https://img.shields.io/badge/HA-2024.1%2B-41BDF5)](https://www.home-assistant.io)
 [![Buy Me a Coffee](https://img.shields.io/badge/%E2%98%95-Buy%20me%20a%20coffee-FF813F)](https://ko-fi.com/patrickgfortin)
@@ -17,6 +17,12 @@ Calculate accurate electricity costs for **fixed-rate tiered (block) and/or Time
 Designed for the majority of households in North America, the Caribbean, Latin America, Asia and Africa that are **not** on dynamic spot-market tariffs.
 
 ---
+
+## What's new in 0.2.8
+
+| Change | Description |
+|---|---|
+| **Billing cycle progress no longer resets on every reload** | `cycle_start_kwh` / `last_cycle_start` (what "Cycle Consumption" and "Forecast Bill" measure from) lived only in memory and were wiped back to "just started now" on every HA restart *and* every Options save/reload — not just at the real calendar billing-cycle rollover. Prepaid balance had the identical bug. Both are now persisted to disk (`.storage/gridmetrics_<entry_id>_cycle`) and restored on setup, so they only reset when the real billing cycle actually rolls over, or when you explicitly call `gridmetrics.reset_billing_cycle`. |
 
 ## What's new in 0.2.7
 

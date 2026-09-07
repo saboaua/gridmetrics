@@ -1,7 +1,7 @@
 """Constants for GridMetrics."""
 
 DOMAIN = "gridmetrics"
-VERSION = "0.2.7"
+VERSION = "0.2.8"
 
 # Config entry schema version (HA config_entries versioning, NOT the
 # integration release version above). Bump this in lockstep with

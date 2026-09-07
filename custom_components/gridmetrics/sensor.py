@@ -17,6 +17,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util import dt as dt_util
 
+from . import async_save_cycle_state
 from .const import (
     DOMAIN,
     CONF_SOURCE_SENSOR,
@@ -414,10 +415,12 @@ class BaseCostSensor(SensorEntity):
         if last_reset is None or last_reset < cycle_start:
             data["cycle_start_kwh"] = current
             data["last_cycle_start"] = cycle_start
+            async_save_cycle_state(self.hass, self._entry.entry_id)
             return 0.0
 
         if start_kwh is None:
             data["cycle_start_kwh"] = current
+            async_save_cycle_state(self.hass, self._entry.entry_id)
             return 0.0
 
         return max(0.0, current - start_kwh)
