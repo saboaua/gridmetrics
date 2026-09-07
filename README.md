@@ -5,6 +5,7 @@
 <p align="center">
 Tiered / Time-of-Use Electricity Rate Calculator for Home Assistant
 </p>
+
 <p align="center">
 [![release](https://img.shields.io/badge/release-v0.2.4-2c3e50)](https://github.com/your-github-handle/ha-gridmetrics/releases)
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange)](https://hacs.xyz)
