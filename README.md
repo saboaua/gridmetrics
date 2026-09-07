@@ -4,7 +4,7 @@
 
 Tiered / Time-of-Use Electricity Rate Calculator for Home Assistant
 
-[![release](https://img.shields.io/badge/release-v0.2.5-2c3e50)](https://github.com/saboaua/gridmetrics/releases)
+[![release](https://img.shields.io/badge/release-v0.2.6-2c3e50)](https://github.com/saboaua/gridmetrics/releases)
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange)](https://hacs.xyz)
 [![HA](https://img.shields.io/badge/HA-2024.1%2B-41BDF5)](https://www.home-assistant.io)
 [![Buy Me a Coffee](https://img.shields.io/badge/%E2%98%95-Buy%20me%20a%20coffee-FF813F)](https://ko-fi.com/patrickgfortin)
@@ -17,6 +17,12 @@ Calculate accurate electricity costs for **fixed-rate tiered (block) and/or Time
 Designed for the majority of households in North America, the Caribbean, Latin America, Asia and Africa that are **not** on dynamic spot-market tariffs.
 
 ---
+
+## What's new in 0.2.6
+
+| Change | Description |
+|---|---|
+| **Fixed dead "cumulative kWh" solar/grid path** | The "This sensor is cumulative kWh, not live Watts" checkbox previously caused the solar/grid reading to be silently discarded (always 0) instead of being handled. Solar Production, Grid Import/Export, and Home Consumption now derive instantaneous power from the sensor's rate of change when this box is checked, instead of going dark. If your solar entity is a lifetime/cumulative production sensor (common on Enphase Envoy), this is very likely why `sensor.*_solar_production` was stuck at 0. |
 
 ## What's new in 0.2.5
 

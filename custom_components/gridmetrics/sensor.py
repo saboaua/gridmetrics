@@ -96,36 +96,78 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-def _read_solar_power(hass: HomeAssistant, config: dict) -> float:
+def _derive_power_w(
+    hass: HomeAssistant, entry_id: str | None, entity_id: str, raw_kwh: float
+) -> float:
+    """Estimate instantaneous power (W) from a cumulative kWh sensor.
+
+    Used when the solar/grid source is marked "cumulative kWh, not live
+    Watts" (CONF_SOLAR_IS_ENERGY / CONF_GRID_IS_ENERGY). Previously that
+    flag caused the reading to be discarded entirely (always 0) - this
+    instead tracks the last value/timestamp per entity_id and reports
+    the rate of change as watts, same as any energy-to-power estimate.
+    A negative delta (counter reset/rollover) reports 0 for that tick
+    rather than a bogus negative power.
+    """
+    if entry_id is None:
+        return 0.0
+    store = hass.data.get(DOMAIN, {}).get(entry_id)
+    if store is None:
+        return 0.0
+    tracker = store.setdefault("energy_derive", {})
+    now = dt_util.utcnow()
+    last_kwh, last_ts = tracker.get(entity_id, (None, None))
+    power = 0.0
+    if last_kwh is not None and last_ts is not None:
+        hours = (now - last_ts).total_seconds() / 3600.0
+        if hours > 0:
+            delta = raw_kwh - last_kwh
+            if delta >= 0:
+                power = (delta / hours) * 1000.0
+    tracker[entity_id] = (raw_kwh, now)
+    return max(0.0, power)
+
+
+def _read_solar_power(
+    hass: HomeAssistant, config: dict, entry_id: str | None = None
+) -> float:
     entity_id = config.get(CONF_SOLAR_SENSOR)
     if not entity_id:
         return 0.0
     val = _safe_float(hass.states.get(entity_id))
-    if val is None or config.get(CONF_SOLAR_IS_ENERGY):
+    if val is None:
         return 0.0
+    if config.get(CONF_SOLAR_IS_ENERGY):
+        return _derive_power_w(hass, entry_id, entity_id, val)
     return max(0.0, val)
 
 
-def _read_grid_power(hass: HomeAssistant, config: dict) -> float:
+def _read_grid_power(
+    hass: HomeAssistant, config: dict, entry_id: str | None = None
+) -> float:
     """Signed grid power: positive = import, negative = export."""
     phases = config.get(CONF_GRID_PHASES) or []
     sign = config.get(CONF_GRID_SIGN, "positive_import")
+    is_energy = config.get(CONF_GRID_IS_ENERGY)
 
     if phases:
         total = 0.0
         for eid in phases:
             val = _safe_float(hass.states.get(eid))
-            if val is not None:
-                total += val
+            if val is None:
+                continue
+            total += (
+                _derive_power_w(hass, entry_id, eid, val) if is_energy else val
+            )
         raw = total
     else:
         entity_id = config.get(CONF_GRID_SENSOR)
         if not entity_id:
             return 0.0
         val = _safe_float(hass.states.get(entity_id))
-        if val is None or config.get(CONF_GRID_IS_ENERGY):
+        if val is None:
             return 0.0
-        raw = val
+        raw = _derive_power_w(hass, entry_id, entity_id, val) if is_energy else val
 
     if sign == "positive_export":
         return -raw
@@ -190,7 +232,7 @@ class SolarProductionPowerSensor(SolarBaseSensor):
 
     @property
     def native_value(self) -> float:
-        return round(_read_solar_power(self.hass, self._config), 1)
+        return round(_read_solar_power(self.hass, self._config, self._entry.entry_id), 1)
 
 
 class GridImportPowerSensor(SolarBaseSensor):
@@ -202,7 +244,7 @@ class GridImportPowerSensor(SolarBaseSensor):
 
     @property
     def native_value(self) -> float:
-        return round(max(0.0, _read_grid_power(self.hass, self._config)), 1)
+        return round(max(0.0, _read_grid_power(self.hass, self._config, self._entry.entry_id)), 1)
 
 
 class GridExportPowerSensor(SolarBaseSensor):
@@ -214,7 +256,7 @@ class GridExportPowerSensor(SolarBaseSensor):
 
     @property
     def native_value(self) -> float:
-        return round(max(0.0, -_read_grid_power(self.hass, self._config)), 1)
+        return round(max(0.0, -_read_grid_power(self.hass, self._config, self._entry.entry_id)), 1)
 
 
 class HomeConsumptionPowerSensor(SolarBaseSensor):
@@ -226,14 +268,14 @@ class HomeConsumptionPowerSensor(SolarBaseSensor):
 
     @property
     def native_value(self) -> float:
-        solar = _read_solar_power(self.hass, self._config)
-        grid = _read_grid_power(self.hass, self._config)
+        solar = _read_solar_power(self.hass, self._config, self._entry.entry_id)
+        grid = _read_grid_power(self.hass, self._config, self._entry.entry_id)
         return round(max(0.0, solar + grid), 1)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        solar = _read_solar_power(self.hass, self._config)
-        grid = _read_grid_power(self.hass, self._config)
+        solar = _read_solar_power(self.hass, self._config, self._entry.entry_id)
+        grid = _read_grid_power(self.hass, self._config, self._entry.entry_id)
         return {
             "solar_w": round(solar, 1),
             "grid_signed_w": round(grid, 1),
@@ -273,7 +315,7 @@ class SolarProductionEnergySensor(_EnergyAccumulator):
 
     @property
     def native_value(self) -> float:
-        return round(self._accumulate(_read_solar_power(self.hass, self._config)), 4)
+        return round(self._accumulate(_read_solar_power(self.hass, self._config, self._entry.entry_id)), 4)
 
 
 class GridImportEnergySensor(_EnergyAccumulator):
@@ -282,7 +324,7 @@ class GridImportEnergySensor(_EnergyAccumulator):
 
     @property
     def native_value(self) -> float:
-        g = _read_grid_power(self.hass, self._config)
+        g = _read_grid_power(self.hass, self._config, self._entry.entry_id)
         return round(self._accumulate(max(0.0, g)), 4)
 
 
@@ -292,7 +334,7 @@ class GridExportEnergySensor(_EnergyAccumulator):
 
     @property
     def native_value(self) -> float:
-        g = _read_grid_power(self.hass, self._config)
+        g = _read_grid_power(self.hass, self._config, self._entry.entry_id)
         return round(self._accumulate(max(0.0, -g)), 4)
 
 
@@ -302,8 +344,8 @@ class HomeConsumptionEnergySensor(_EnergyAccumulator):
 
     @property
     def native_value(self) -> float:
-        solar = _read_solar_power(self.hass, self._config)
-        grid = _read_grid_power(self.hass, self._config)
+        solar = _read_solar_power(self.hass, self._config, self._entry.entry_id)
+        grid = _read_grid_power(self.hass, self._config, self._entry.entry_id)
         return round(self._accumulate(max(0.0, solar + grid)), 4)
 
 
