@@ -408,7 +408,7 @@ class BaseCostSensor(SensorEntity):
             return 0.0
         start_kwh = data.get("cycle_start_kwh")
         billing_day = self._config.get(CONF_BILLING_CYCLE_DAY, 1)
-        cycle_start, _ = _get_cycle_bounds(billing_day)
+        cycle_start, _ = _get_cycle_bounds(billing_day, dt_util.now())
 
         last_reset = data.get("last_cycle_start")
         if last_reset is None or last_reset < cycle_start:
@@ -522,8 +522,8 @@ class ForecastBillSensor(BaseCostSensor):
         try:
             consumption = self._get_cycle_consumption()
             billing_day = self._config.get(CONF_BILLING_CYCLE_DAY, 1)
-            start, end = _get_cycle_bounds(billing_day)
             now = dt_util.now()
+            start, end = _get_cycle_bounds(billing_day, now)
             days_elapsed = max(1.0, (now - start).total_seconds() / 86400)
             total_days = max(1.0, (end - start).total_seconds() / 86400)
             projected_kwh = consumption * (total_days / days_elapsed)

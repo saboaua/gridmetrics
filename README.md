@@ -4,7 +4,7 @@
 
 Tiered / Time-of-Use Electricity Rate Calculator for Home Assistant
 
-[![release](https://img.shields.io/badge/release-v0.2.6-2c3e50)](https://github.com/saboaua/gridmetrics/releases)
+[![release](https://img.shields.io/badge/release-v0.2.7-2c3e50)](https://github.com/saboaua/gridmetrics/releases)
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange)](https://hacs.xyz)
 [![HA](https://img.shields.io/badge/HA-2024.1%2B-41BDF5)](https://www.home-assistant.io)
 [![Buy Me a Coffee](https://img.shields.io/badge/%E2%98%95-Buy%20me%20a%20coffee-FF813F)](https://ko-fi.com/patrickgfortin)
@@ -17,6 +17,12 @@ Calculate accurate electricity costs for **fixed-rate tiered (block) and/or Time
 Designed for the majority of households in North America, the Caribbean, Latin America, Asia and Africa that are **not** on dynamic spot-market tariffs.
 
 ---
+
+## What's new in 0.2.7
+
+| Change | Description |
+|---|---|
+| **Fixed Forecast Bill stuck at 0** | `Forecast Bill` computes billing-cycle boundaries with a naive (no-timezone) `datetime`, then subtracted it from Home Assistant's timezone-aware "now" - Python raises `TypeError` on that, which was being caught and silently turned into `0.0`. `get_cycle_bounds()` is now called with HA's timezone-aware clock everywhere, so the subtraction is valid and Forecast Bill reports a real projected total again. |
 
 ## What's new in 0.2.6
 
