@@ -5,13 +5,13 @@
 <p align="center">
 Tiered / Time-of-Use Electricity Rate Calculator for Home Assistant
 </p>
-
+<p align="center">
 [![release](https://img.shields.io/badge/release-v0.2.4-2c3e50)](https://github.com/your-github-handle/ha-gridmetrics/releases)
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange)](https://hacs.xyz)
 [![HA](https://img.shields.io/badge/HA-2024.1%2B-41BDF5)](https://www.home-assistant.io)
 [![Buy Me a Coffee](https://img.shields.io/badge/%E2%98%95-Buy%20me%20a%20coffee-FF813F)](https://ko-fi.com/patrickgfortin)
 [![issues](https://img.shields.io/github/issues/your-github-handle/ha-gridmetrics)](https://github.com/your-github-handle/ha-gridmetrics/issues)
-
+</p>
 Calculate accurate electricity costs for **fixed-rate tiered (block) and/or Time-of-Use plans**, with **guided solar / net-metering onboarding**.
 
 Designed for the majority of households in North America, the Caribbean, Latin America, Asia and Africa that are **not** on dynamic spot-market tariffs.
