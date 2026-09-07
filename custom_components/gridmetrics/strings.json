@@ -106,6 +106,13 @@
     "step": {
       "init": {
         "title": "Update GridMetrics settings",
+        "menu_options": {
+          "general": "General (pricing, currency, billing)",
+          "sensors": "Sensors (solar / grid / source)"
+        }
+      },
+      "general": {
+        "title": "General settings",
         "data": {
           "fixed_charge": "Monthly fixed charge",
           "tax_percent": "Tax percent",
@@ -113,7 +120,27 @@
           "export_rate": "Feed-in rate",
           "currency": "Currency"
         }
+      },
+      "sensors": {
+        "title": "Sensors",
+        "description": "Change which entities GridMetrics reads from. Useful if your Enphase, Shelly or utility sensor's entity_id changed and stopped reporting.",
+        "data": {
+          "solar_sensor": "Solar production sensor",
+          "solar_is_energy": "This sensor is cumulative kWh (not live Watts)",
+          "grid_setup_type": "Grid meter type",
+          "phase_a": "Phase A power sensor",
+          "phase_b": "Phase B power sensor",
+          "phase_c": "Phase C power sensor",
+          "grid_sensor": "Grid net power sensor (single-sensor mode)",
+          "grid_is_energy": "These are cumulative kWh sensors (not live Watts)",
+          "grid_sign": "What does a positive number mean?",
+          "source_sensor": "Energy sensor (kWh) used for billing"
+        }
       }
+    },
+    "error": {
+      "need_one_phase": "Select at least one phase sensor (A, B or C).",
+      "need_grid_sensor": "Select a grid sensor, or switch to multiple phases."
     }
   }
 }

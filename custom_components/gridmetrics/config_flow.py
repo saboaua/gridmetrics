@@ -447,8 +447,17 @@ class GridMetricsOptionsFlow(config_entries.OptionsFlow):
     """Options flow (HA modern style - no config_entry in __init__)."""
 
     async def async_step_init(self, user_input=None):
+        """Top-level menu: general pricing settings, or sensor picks."""
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["general", "sensors"],
+        )
+
+    async def async_step_general(self, user_input=None):
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            return self.async_create_entry(
+                title="", data={**self.config_entry.options, **user_input}
+            )
 
         data = {**self.config_entry.data, **self.config_entry.options}
         schema = vol.Schema(
@@ -482,4 +491,154 @@ class GridMetricsOptionsFlow(config_entries.OptionsFlow):
                 ),
             }
         )
-        return self.async_show_form(step_id="init", data_schema=schema)
+        return self.async_show_form(step_id="general", data_schema=schema)
+
+    async def async_step_sensors(self, user_input=None):
+        """Re-pick solar/grid/source sensors without recreating the entry.
+
+        Uses entry.options (merged over entry.data, same as every other
+        setting here) so an entity that stops reporting - Enphase
+        firmware update, Shelly replaced, HACS renamed an entity_id -
+        can be swapped from Configure instead of deleting and
+        re-adding the whole integration.
+        """
+        errors: dict = {}
+        entry_data = self.config_entry.data
+        merged = {**entry_data, **self.config_entry.options}
+        setup_type = entry_data.get(CONF_SETUP_TYPE, SETUP_SOLAR_GRID)
+
+        if user_input is not None:
+            result = dict(self.config_entry.options)
+
+            if setup_type == SETUP_GRID_ONLY:
+                result[CONF_SOURCE_SENSOR] = user_input[CONF_SOURCE_SENSOR]
+            else:
+                result[CONF_SOLAR_SENSOR] = user_input[CONF_SOLAR_SENSOR]
+                result[CONF_SOLAR_IS_ENERGY] = user_input.get(
+                    CONF_SOLAR_IS_ENERGY, False
+                )
+                grid_mode = user_input[CONF_GRID_SETUP_TYPE]
+                if grid_mode == GRID_SETUP_PHASES:
+                    phases = [
+                        user_input.get(key)
+                        for key in ("phase_a", "phase_b", "phase_c")
+                        if user_input.get(key)
+                    ]
+                    if not phases:
+                        errors["base"] = "need_one_phase"
+                    else:
+                        result[CONF_GRID_PHASES] = phases
+                        result[CONF_GRID_SENSOR] = None
+                else:
+                    if not user_input.get(CONF_GRID_SENSOR):
+                        errors["base"] = "need_grid_sensor"
+                    else:
+                        result[CONF_GRID_SENSOR] = user_input[CONF_GRID_SENSOR]
+                        result[CONF_GRID_PHASES] = []
+
+                if not errors:
+                    result[CONF_GRID_IS_ENERGY] = user_input.get(
+                        CONF_GRID_IS_ENERGY, False
+                    )
+                    result[CONF_GRID_SIGN] = user_input.get(
+                        CONF_GRID_SIGN, "positive_import"
+                    )
+
+            if not errors:
+                return self.async_create_entry(title="", data=result)
+
+        return self.async_show_form(
+            step_id="sensors",
+            data_schema=self._sensors_schema(merged, setup_type),
+            errors=errors,
+        )
+
+    def _sensors_schema(self, data, setup_type):
+        if setup_type == SETUP_GRID_ONLY:
+            return vol.Schema(
+                {
+                    vol.Required(
+                        CONF_SOURCE_SENSOR, default=data.get(CONF_SOURCE_SENSOR)
+                    ): selector.EntitySelector(
+                        selector.EntitySelectorConfig(
+                            domain="sensor", device_class="energy"
+                        )
+                    ),
+                }
+            )
+
+        ent_power = selector.EntitySelector(
+            selector.EntitySelectorConfig(
+                domain="sensor", device_class=["power", "energy"]
+            )
+        )
+        current_phases = data.get(CONF_GRID_PHASES) or []
+        current_mode = GRID_SETUP_PHASES if current_phases else GRID_SETUP_SINGLE
+
+        schema_dict = {
+            vol.Required(
+                CONF_SOLAR_SENSOR, default=data.get(CONF_SOLAR_SENSOR)
+            ): ent_power,
+            vol.Required(
+                CONF_SOLAR_IS_ENERGY, default=data.get(CONF_SOLAR_IS_ENERGY, False)
+            ): bool,
+            vol.Required(
+                CONF_GRID_SETUP_TYPE, default=current_mode
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[
+                        {
+                            "value": GRID_SETUP_PHASES,
+                            "label": "Multiple phases (Shelly 3EM / 3-phase meter)",
+                        },
+                        {
+                            "value": GRID_SETUP_SINGLE,
+                            "label": "One single grid sensor",
+                        },
+                    ],
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+        }
+
+        for i, key in enumerate(("phase_a", "phase_b", "phase_c")):
+            default = current_phases[i] if i < len(current_phases) else None
+            if default:
+                schema_dict[vol.Optional(key, default=default)] = ent_power
+            else:
+                schema_dict[vol.Optional(key)] = ent_power
+
+        grid_sensor_default = data.get(CONF_GRID_SENSOR)
+        if grid_sensor_default:
+            schema_dict[
+                vol.Optional(CONF_GRID_SENSOR, default=grid_sensor_default)
+            ] = ent_power
+        else:
+            schema_dict[vol.Optional(CONF_GRID_SENSOR)] = ent_power
+
+        schema_dict[
+            vol.Required(
+                CONF_GRID_IS_ENERGY, default=data.get(CONF_GRID_IS_ENERGY, False)
+            )
+        ] = bool
+        schema_dict[
+            vol.Required(
+                CONF_GRID_SIGN, default=data.get(CONF_GRID_SIGN, "positive_import")
+            )
+        ] = selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=[
+                    {
+                        "value": "positive_import",
+                        "label": "Positive = importing FROM the grid",
+                    },
+                    {
+                        "value": "positive_export",
+                        "label": "Positive = exporting TO the grid",
+                    },
+                ],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        )
+
+        return vol.Schema(schema_dict)
