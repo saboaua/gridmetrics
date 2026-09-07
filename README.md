@@ -1,6 +1,10 @@
-# GridMetrics
+<p align="center">
+  <img src="custom_components/gridmetrics/brand/logo.png" alt="GridMetrics" width="480">
+</p>
 
-**Tiered / Time-of-Use Electricity Rate Calculator for Home Assistant**
+<p align="center">
+Tiered / Time-of-Use Electricity Rate Calculator for Home Assistant
+</p>
 
 [![release](https://img.shields.io/badge/release-v0.2.4-2c3e50)](https://github.com/your-github-handle/ha-gridmetrics/releases)
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange)](https://hacs.xyz)
@@ -129,6 +133,8 @@ data:
 **Manual:** copy `custom_components/gridmetrics/` into your `config/custom_components/` and restart.
 
 Minimum supported Home Assistant version: **2024.1.0**.
+
+**Brand assets:** icon/logo images ship inside the integration at `custom_components/gridmetrics/brand/` (`icon.png`, `icon@2x.png`, `logo.png`, `logo@2x.png`). HA 2024.1+ has always been able to fall back to the community `home-assistant/brands` repo for these, but as of HA 2026.3 custom integrations can ship brand images locally and HA serves them directly — no external PR needed, and it also clears HACS's brand-assets validation check.
 
 ---
 
