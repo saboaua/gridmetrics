@@ -94,7 +94,8 @@
     "error": {
       "invalid_tiers": "Could not parse tiers. Use: 200:0.25,500:0.32,99999:0.41",
       "invalid_tou": "Could not parse TOU. Use: name|HH:MM|HH:MM|rate|true/false;...",
-      "need_one_phase": "Select at least one phase sensor (A, B or C)."
+      "need_one_phase": "Select at least one phase sensor (A, B or C).",
+      "need_grid_sensor": "Select a grid sensor, or switch to multiple phases."
     },
     "abort": {
       "already_configured": "Already configured"
@@ -143,6 +144,46 @@
     "error": {
       "need_one_phase": "Select at least one phase sensor (A, B or C).",
       "need_grid_sensor": "Select a grid sensor, or switch to multiple phases."
+    }
+  },
+  "services": {
+    "add_prepaid_credit": {
+      "name": "Add prepaid credit",
+      "description": "Add an amount to the prepaid meter balance (after buying power).",
+      "fields": {
+        "entry_id": {
+          "name": "Config entry ID",
+          "description": "The entry_id of the integration instance."
+        },
+        "amount": {
+          "name": "Amount",
+          "description": "Credit amount to add (in the configured currency)."
+        }
+      }
+    },
+    "set_prepaid_balance": {
+      "name": "Set prepaid balance",
+      "description": "Set the absolute prepaid balance (e.g. after a full top-up).",
+      "fields": {
+        "entry_id": {
+          "name": "Config entry ID",
+          "description": "The entry_id of the integration instance."
+        },
+        "amount": {
+          "name": "Amount",
+          "description": "New absolute balance."
+        }
+      }
+    },
+    "reset_billing_cycle": {
+      "name": "Reset billing cycle",
+      "description": "Force a reset of the cycle consumption baseline.",
+      "fields": {
+        "entry_id": {
+          "name": "Config entry ID",
+          "description": "The entry_id of the integration instance."
+        }
+      }
     }
   }
 }

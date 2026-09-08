@@ -3,6 +3,31 @@
   "content_in_root": false,
   "filename": "gridmetrics.zip",
   "render_readme": true,
+  "domains": [
+    "sensor"
+  ],
   "homeassistant": "2024.1.0",
-  "country": ["AW", "US", "MX", "JM", "BB", "TT", "CA", "BR", "CO", "AR", "CL", "PE", "IN", "ZA", "NG", "KE", "PH", "TH", "NL", "GB"]
+  "iot_class": "Local Polling",
+  "country": [
+    "AW",
+    "US",
+    "MX",
+    "JM",
+    "BB",
+    "TT",
+    "CA",
+    "BR",
+    "CO",
+    "AR",
+    "CL",
+    "PE",
+    "IN",
+    "ZA",
+    "NG",
+    "KE",
+    "PH",
+    "TH",
+    "NL",
+    "GB"
+  ]
 }
