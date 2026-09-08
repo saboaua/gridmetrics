@@ -111,12 +111,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if last_cycle_start:
         last_cycle_start = dt_util.parse_datetime(last_cycle_start)
 
+    # Default import/export totals and cycle baselines to 0.0 (not None) so
+    # a cost-sensor read that races ahead of the first energy-accumulator
+    # tick still stamps a true-zero baseline. Without this, the first
+    # non-zero accumulator value was treated as the new zero and the
+    # intervening kWh were silently dropped (Bug 1 in the 0.2.9 QA report).
     hass.data[DOMAIN][entry.entry_id] = {
         "config": entry.data,
         "options": entry.options,
         "cycle_start_kwh": saved.get("cycle_start_kwh"),
-        "cycle_start_import_kwh": saved.get("cycle_start_import_kwh"),
-        "cycle_start_export_kwh": saved.get("cycle_start_export_kwh"),
+        "cycle_start_import_kwh": saved.get("cycle_start_import_kwh", 0.0),
+        "cycle_start_export_kwh": saved.get("cycle_start_export_kwh", 0.0),
         "last_cycle_start": last_cycle_start,
         "prepaid_balance": saved.get(
             "prepaid_balance", entry.data.get(CONF_PREPAID_BALANCE, 0.0)
@@ -125,9 +130,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "accum_GridImportEnergySensor": saved.get("accum_GridImportEnergySensor"),
         "accum_GridExportEnergySensor": saved.get("accum_GridExportEnergySensor"),
         "accum_SolarProductionEnergySensor": saved.get("accum_SolarProductionEnergySensor"),
-        "home_consumption_kwh": saved.get("home_consumption_kwh"),
-        "grid_import_kwh": saved.get("grid_import_kwh"),
-        "grid_export_kwh": saved.get("grid_export_kwh"),
+        "home_consumption_kwh": saved.get("home_consumption_kwh", 0.0),
+        "grid_import_kwh": saved.get("grid_import_kwh", 0.0),
+        "grid_export_kwh": saved.get("grid_export_kwh", 0.0),
         "cycle_store": store,
     }
 
@@ -163,8 +168,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             """Manually reset the billing cycle tracking."""
             entry_id = call.data.get("entry_id")
             if entry_id and entry_id in hass.data[DOMAIN]:
-                hass.data[DOMAIN][entry_id]["cycle_start_kwh"] = None
-                hass.data[DOMAIN][entry_id]["last_cycle_start"] = None
+                data = hass.data[DOMAIN][entry_id]
+                data["cycle_start_kwh"] = None
+                data["cycle_start_import_kwh"] = 0.0
+                data["cycle_start_export_kwh"] = 0.0
+                data["last_cycle_start"] = None
                 async_save_cycle_state(hass, entry_id)
                 _LOGGER.info("Billing cycle reset for %s", entry_id)
 

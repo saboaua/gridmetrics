@@ -414,90 +414,88 @@ class BaseCostSensor(SensorEntity):
     def _handle_source_change(self, event) -> None:
         self.async_schedule_update_ha_state(True)
 
+    def _net_metered(self) -> bool:
+        """True when this entry uses solar net-metering (import/export flows)."""
+        return (
+            self._config.get(CONF_SETUP_TYPE) == SETUP_SOLAR_GRID
+            or self._source == "derived_home_consumption"
+        )
+
     def _get_source_kwh(self) -> float | None:
-        if self._source == "derived_home_consumption" or self._config.get(
-            CONF_SETUP_TYPE
-        ) == SETUP_SOLAR_GRID:
+        if self._net_metered():
             data = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id, {})
             return data.get("home_consumption_kwh")
         return _safe_float(self.hass.states.get(self._source))
 
-    def _get_import_export_kwh(self) -> tuple[float, float]:
-        """Return (cycle_import_kwh, cycle_export_kwh)."""
+    def _get_net_and_flows(self) -> tuple[float, float, float]:
+        """Return (net_billed_kwh, cycle_import_kwh, cycle_export_kwh).
+
+        Solar / net-metered path
+        ------------------------
+        net = max(0, cycle_import - cycle_export)
+        cycle_import / cycle_export are deltas from the cycle baseline.
+
+        Grid-only path
+        --------------
+        net = delta of the configured source energy sensor for this cycle.
+        cycle_import / cycle_export are returned as 0.0 so attributes never
+        leak the utility meter's lifetime reading (Bug 2).
+        """
         data = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id)
         if data is None:
-            return 0.0, 0.0
-
-        current_imp = data.get("grid_import_kwh")
-        current_exp = data.get("grid_export_kwh")
-        if current_imp is None and current_exp is None:
-            # Fallback: no solar energy sensors yet → treat source as import
-            src = self._get_source_kwh()
-            return (src or 0.0), 0.0
-
-        current_imp = float(current_imp or 0.0)
-        current_exp = float(current_exp or 0.0)
+            return 0.0, 0.0, 0.0
 
         billing_day = self._config.get(CONF_BILLING_CYCLE_DAY, 1)
         cycle_start, _ = _get_cycle_bounds(billing_day, dt_util.now())
         last_reset = data.get("last_cycle_start")
+        new_cycle = last_reset is None or last_reset < cycle_start
 
-        if last_reset is None or last_reset < cycle_start:
-            data["cycle_start_import_kwh"] = current_imp
-            data["cycle_start_export_kwh"] = current_exp
-            data["cycle_start_kwh"] = self._get_source_kwh()
-            data["last_cycle_start"] = cycle_start
-            async_save_cycle_state(self.hass, self._entry.entry_id)
-            return 0.0, 0.0
+        if self._net_metered():
+            # Live totals from energy accumulators (defaulted to 0.0 at setup
+            # so a cost-sensor read that races the first accumulator tick still
+            # stamps a true-zero baseline — Bug 1 fix).
+            current_imp = float(data.get("grid_import_kwh") or 0.0)
+            current_exp = float(data.get("grid_export_kwh") or 0.0)
 
-        start_imp = data.get("cycle_start_import_kwh")
-        start_exp = data.get("cycle_start_export_kwh")
-        if start_imp is None:
-            data["cycle_start_import_kwh"] = current_imp
-            start_imp = current_imp
-        if start_exp is None:
-            data["cycle_start_export_kwh"] = current_exp
-            start_exp = current_exp
-            async_save_cycle_state(self.hass, self._entry.entry_id)
+            if new_cycle:
+                data["cycle_start_import_kwh"] = current_imp
+                data["cycle_start_export_kwh"] = current_exp
+                data["last_cycle_start"] = cycle_start
+                async_save_cycle_state(self.hass, self._entry.entry_id)
+                return 0.0, 0.0, 0.0
 
-        return max(0.0, current_imp - float(start_imp)), max(
-            0.0, current_exp - float(start_exp)
-        )
+            start_imp = float(data.get("cycle_start_import_kwh") or 0.0)
+            start_exp = float(data.get("cycle_start_export_kwh") or 0.0)
+            cycle_imp = max(0.0, current_imp - start_imp)
+            cycle_exp = max(0.0, current_exp - start_exp)
+            net = max(0.0, cycle_imp - cycle_exp)
+            return net, cycle_imp, cycle_exp
 
-    def _get_cycle_consumption(self) -> float:
-        """Net billed consumption for the current cycle.
-
-        Solar path: max(0, cycle_import - cycle_export)  (true net metering)
-        Grid-only path: delta of the configured source energy sensor.
-        """
-        if self._config.get(CONF_SETUP_TYPE) == SETUP_SOLAR_GRID or self._source == "derived_home_consumption":
-            imp, exp = self._get_import_export_kwh()
-            return max(0.0, imp - exp)
-
+        # ---- Grid-only ----
         current = self._get_source_kwh()
         if current is None:
-            return 0.0
+            return 0.0, 0.0, 0.0
 
-        data = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id)
-        if data is None:
-            return 0.0
-        start_kwh = data.get("cycle_start_kwh")
-        billing_day = self._config.get(CONF_BILLING_CYCLE_DAY, 1)
-        cycle_start, _ = _get_cycle_bounds(billing_day, dt_util.now())
-
-        last_reset = data.get("last_cycle_start")
-        if last_reset is None or last_reset < cycle_start:
+        if new_cycle:
             data["cycle_start_kwh"] = current
             data["last_cycle_start"] = cycle_start
             async_save_cycle_state(self.hass, self._entry.entry_id)
-            return 0.0
+            return 0.0, 0.0, 0.0
 
+        start_kwh = data.get("cycle_start_kwh")
         if start_kwh is None:
             data["cycle_start_kwh"] = current
             async_save_cycle_state(self.hass, self._entry.entry_id)
-            return 0.0
+            return 0.0, 0.0, 0.0
 
-        return max(0.0, current - start_kwh)
+        net = max(0.0, current - float(start_kwh))
+        # Import/export attributes stay 0 for grid-only (no bogus lifetime leak)
+        return net, 0.0, 0.0
+
+    def _get_cycle_consumption(self) -> float:
+        """Net billed consumption for the current cycle."""
+        net, _, _ = self._get_net_and_flows()
+        return net
 
     def _calc_bill_components(self, net_kwh: float, cycle_imp: float, cycle_exp: float) -> dict:
         """Shared bill math for Estimated + Forecast sensors."""
@@ -585,11 +583,7 @@ class EstimatedBillSensor(BaseCostSensor):
     @property
     def native_value(self) -> float | None:
         try:
-            imp, exp = self._get_import_export_kwh()
-            net = max(0.0, imp - exp) if (
-                self._config.get(CONF_SETUP_TYPE) == SETUP_SOLAR_GRID
-                or self._source == "derived_home_consumption"
-            ) else self._get_cycle_consumption()
+            net, imp, exp = self._get_net_and_flows()
             components = self._calc_bill_components(net, imp, exp)
             return components["total"]
         except Exception as err:
@@ -599,11 +593,7 @@ class EstimatedBillSensor(BaseCostSensor):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         try:
-            imp, exp = self._get_import_export_kwh()
-            net = max(0.0, imp - exp) if (
-                self._config.get(CONF_SETUP_TYPE) == SETUP_SOLAR_GRID
-                or self._source == "derived_home_consumption"
-            ) else self._get_cycle_consumption()
+            net, imp, exp = self._get_net_and_flows()
             return self._calc_bill_components(net, imp, exp)
         except Exception:
             return {}
@@ -622,11 +612,11 @@ class CycleConsumptionSensor(BaseCostSensor):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        imp, exp = self._get_import_export_kwh()
+        net, imp, exp = self._get_net_and_flows()
         return {
             "cycle_import_kwh": round(imp, 3),
             "cycle_export_kwh": round(exp, 3),
-            "net_kwh": round(max(0.0, imp - exp), 3),
+            "net_kwh": round(net, 3),
         }
 
 
@@ -651,20 +641,16 @@ class ForecastBillSensor(BaseCostSensor):
             total_days = max(1.0, (end - start).total_seconds() / 86400)
             factor = total_days / days_elapsed
 
-            imp, exp = self._get_import_export_kwh()
-            if (
-                self._config.get(CONF_SETUP_TYPE) == SETUP_SOLAR_GRID
-                or self._source == "derived_home_consumption"
-            ):
+            net, imp, exp = self._get_net_and_flows()
+            if self._net_metered():
                 proj_imp = imp * factor
                 proj_exp = exp * factor
-                net = max(0.0, proj_imp - proj_exp)
+                proj_net = max(0.0, proj_imp - proj_exp)
             else:
-                consumption = self._get_cycle_consumption()
-                net = consumption * factor
-                proj_imp, proj_exp = net, 0.0
+                proj_net = net * factor
+                proj_imp, proj_exp = proj_net, 0.0
 
-            components = self._calc_bill_components(net, proj_imp, proj_exp)
+            components = self._calc_bill_components(proj_net, proj_imp, proj_exp)
             return components["total"]
         except Exception as err:
             _LOGGER.debug("Forecast bill calc error: %s", err)

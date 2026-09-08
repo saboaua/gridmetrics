@@ -57,11 +57,7 @@
           "phase_b": "Phase B power sensor",
           "phase_c": "Phase C power sensor",
           "grid_is_energy": "These are cumulative kWh sensors (not live Watts)",
-          "grid_sign": "What does a positive number mean?",
-          "export_rate": "Buy-back / surplus rate per kWh (0 if none)",
-          "solar_capacity_kwp": "Solar system size (kWp)",
-          "interconnect_rate": "Interconnection / grid-usage fee per kWp",
-          "interconnect_free_kwp": "Free capacity allowance (kWp, e.g. 3 for Elmar)"
+          "grid_sign": "What does a positive number mean?"
         }
       },
       "grid_single": {
@@ -70,11 +66,7 @@
         "data": {
           "grid_sensor": "Grid net power sensor",
           "grid_is_energy": "This is a cumulative kWh sensor (not live Watts)",
-          "grid_sign": "What does a positive number mean?",
-          "export_rate": "Buy-back / surplus rate per kWh (0 if none)",
-          "solar_capacity_kwp": "Solar system size (kWp)",
-          "interconnect_rate": "Interconnection / grid-usage fee per kWp",
-          "interconnect_free_kwp": "Free capacity allowance (kWp, e.g. 3 for Elmar)"
+          "grid_sign": "What does a positive number mean?"
         }
       },
       "source": {
@@ -123,12 +115,13 @@
           "fixed_charge": "Monthly fixed / access charge",
           "tax_percent": "Tax percent",
           "billing_cycle_day": "Billing cycle start day (1-28)",
-          "export_rate": "Buy-back / surplus rate per kWh",
+          "export_rate": "Buy-back / surplus rate per kWh (0 if none)",
           "currency": "Currency",
           "solar_capacity_kwp": "Solar system size (kWp)",
-          "interconnect_rate": "Interconnection fee per kWp",
-          "interconnect_free_kwp": "Free capacity allowance (kWp)"
-        }
+          "interconnect_rate": "Interconnection / grid-usage fee per kWp",
+          "interconnect_free_kwp": "Free capacity allowance (kWp, e.g. 3 for Elmar)"
+        },
+        "description": "Fixed charge, tax, billing day and currency. For solar setups you can also set system capacity, interconnection fee and buy-back rate here."
       },
       "sensors": {
         "title": "Sensors",

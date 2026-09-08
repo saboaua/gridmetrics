@@ -4,7 +4,7 @@
 
 Tiered / Time-of-Use Electricity Rate Calculator for Home Assistant
 
-[![release](https://img.shields.io/badge/release-v0.2.9-2c3e50)](https://github.com/saboaua/gridmetrics/releases)
+[![release](https://img.shields.io/badge/release-v0.2.10-2c3e50)](https://github.com/saboaua/gridmetrics/releases)
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange)](https://hacs.xyz)
 [![HA](https://img.shields.io/badge/HA-2024.1%2B-41BDF5)](https://www.home-assistant.io)
 [![Buy Me a Coffee](https://img.shields.io/badge/%E2%98%95-Buy%20me%20a%20coffee-FF813F)](https://ko-fi.com/patrickgfortin)
@@ -17,6 +17,16 @@ Calculate accurate electricity costs for **fixed-rate tiered (block) and/or Time
 Designed for the majority of households in North America, the Caribbean, Latin America, Asia and Africa that are **not** on dynamic spot-market tariffs.
 
 ---
+
+## What's new in 0.2.10
+
+| Change | Description |
+|---|---|
+| **First-cycle baseline race fixed** | On a fresh install the cost sensors could read before the energy accumulators produced their first value. The missing baseline was then stamped from the first *non-zero* reading, silently discarding real export/import that had already occurred. Import/export totals and cycle baselines are now defaulted to `0.0` at setup so the true zero is captured from the start. |
+| **Grid-only attribute leak fixed** | `Cycle Consumption` attributes no longer expose the utility meter's lifetime reading as `cycle_import_kwh` on non-solar setups. Import/export attributes stay at 0.0 for grid-only; only net cycle consumption is shown. |
+| **Shared helpers** | Replaced repeated `setup_type == solar_grid` checks with a single `_net_metered()` helper and a unified `_get_net_and_flows()` that both bill sensors and attributes use. |
+| **Options UX** | Interconnection / buy-back fields in **Configure → General** are now shown only for Solar + Grid setups (hidden for grid-only). |
+| **Cleaner onboarding** | Capacity, interconnect fee, free allowance and buy-back rate are **no longer part of the initial setup wizard**. Defaults are applied automatically; configure them later under **Configure → General** only if needed (e.g. Elmar Aruba). Non-Aruba solar users no longer see those fields during install. |
 
 ## What's new in 0.2.9
 
@@ -129,6 +139,19 @@ You get ready-to-use power and energy sensors for the Energy Dashboard, plus a c
 Choose from the dropdown at setup (AWG, USD, MXN, JMD, BBD, TTD, CAD, BRL, COP, ARS, CLP, PEN, INR, ZAR, NGN, KES, PHP, THB, EUR, GBP). You can change it later from **Configure** on the integration entry.
 
 ---
+
+## Solar fees (Aruba Elmar & similar)
+
+After setup, open **Configure → General** on the integration entry (Solar + Grid only) to set:
+
+| Field | Elmar residential default | Meaning |
+|---|---|---|
+| Solar system size (kWp) | 0 | Installed peak capacity |
+| Interconnection fee per kWp | 15 | Monthly grid-usage charge |
+| Free capacity allowance (kWp) | 3 | First N kWp free |
+| Buy-back / surplus rate | 0 | Credit per kWh of net excess export |
+
+Leave them at defaults if your utility has no capacity charge or buy-back programme. The initial setup wizard does **not** ask for these — configure only when needed.
 
 ## Prepaid (Aruba & similar)
 

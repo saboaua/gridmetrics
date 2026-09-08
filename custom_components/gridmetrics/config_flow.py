@@ -221,18 +221,6 @@ class GridMetricsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data[CONF_GRID_SIGN] = user_input.get(
                 CONF_GRID_SIGN, "positive_import"
             )
-            self._data[CONF_EXPORT_RATE] = user_input.get(
-                CONF_EXPORT_RATE, DEFAULT_EXPORT_RATE
-            )
-            self._data[CONF_SOLAR_CAPACITY_KWP] = user_input.get(
-                CONF_SOLAR_CAPACITY_KWP, DEFAULT_SOLAR_CAPACITY_KWP
-            )
-            self._data[CONF_INTERCONNECT_RATE] = user_input.get(
-                CONF_INTERCONNECT_RATE, DEFAULT_INTERCONNECT_RATE
-            )
-            self._data[CONF_INTERCONNECT_FREE_KWP] = user_input.get(
-                CONF_INTERCONNECT_FREE_KWP, DEFAULT_INTERCONNECT_FREE_KWP
-            )
             return await self._after_sensors()
 
         return self.async_show_form(
@@ -270,18 +258,6 @@ class GridMetricsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 ),
-                vol.Optional(CONF_EXPORT_RATE, default=DEFAULT_EXPORT_RATE): vol.Coerce(
-                    float
-                ),
-                vol.Optional(
-                    CONF_SOLAR_CAPACITY_KWP, default=DEFAULT_SOLAR_CAPACITY_KWP
-                ): vol.Coerce(float),
-                vol.Optional(
-                    CONF_INTERCONNECT_RATE, default=DEFAULT_INTERCONNECT_RATE
-                ): vol.Coerce(float),
-                vol.Optional(
-                    CONF_INTERCONNECT_FREE_KWP, default=DEFAULT_INTERCONNECT_FREE_KWP
-                ): vol.Coerce(float),
             }
         )
 
@@ -294,18 +270,6 @@ class GridMetricsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data[CONF_GRID_IS_ENERGY] = user_input.get(CONF_GRID_IS_ENERGY, False)
             self._data[CONF_GRID_SIGN] = user_input.get(
                 CONF_GRID_SIGN, "positive_import"
-            )
-            self._data[CONF_EXPORT_RATE] = user_input.get(
-                CONF_EXPORT_RATE, DEFAULT_EXPORT_RATE
-            )
-            self._data[CONF_SOLAR_CAPACITY_KWP] = user_input.get(
-                CONF_SOLAR_CAPACITY_KWP, DEFAULT_SOLAR_CAPACITY_KWP
-            )
-            self._data[CONF_INTERCONNECT_RATE] = user_input.get(
-                CONF_INTERCONNECT_RATE, DEFAULT_INTERCONNECT_RATE
-            )
-            self._data[CONF_INTERCONNECT_FREE_KWP] = user_input.get(
-                CONF_INTERCONNECT_FREE_KWP, DEFAULT_INTERCONNECT_FREE_KWP
             )
             return await self._after_sensors()
 
@@ -334,18 +298,6 @@ class GridMetricsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 ),
-                vol.Optional(CONF_EXPORT_RATE, default=DEFAULT_EXPORT_RATE): vol.Coerce(
-                    float
-                ),
-                vol.Optional(
-                    CONF_SOLAR_CAPACITY_KWP, default=DEFAULT_SOLAR_CAPACITY_KWP
-                ): vol.Coerce(float),
-                vol.Optional(
-                    CONF_INTERCONNECT_RATE, default=DEFAULT_INTERCONNECT_RATE
-                ): vol.Coerce(float),
-                vol.Optional(
-                    CONF_INTERCONNECT_FREE_KWP, default=DEFAULT_INTERCONNECT_FREE_KWP
-                ): vol.Coerce(float),
             }
         )
         return self.async_show_form(
@@ -475,6 +427,15 @@ class GridMetricsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if self._data.get(CONF_SETUP_TYPE) == SETUP_SOLAR_GRID:
             self._data[CONF_SOURCE_SENSOR] = "derived_home_consumption"
+            # Solar fee defaults — user can change later in Configure → General.
+            # Kept out of the initial wizard so non-Aruba users are not forced
+            # through "interconnect free kWp" during onboarding.
+            self._data.setdefault(CONF_EXPORT_RATE, DEFAULT_EXPORT_RATE)
+            self._data.setdefault(CONF_SOLAR_CAPACITY_KWP, DEFAULT_SOLAR_CAPACITY_KWP)
+            self._data.setdefault(CONF_INTERCONNECT_RATE, DEFAULT_INTERCONNECT_RATE)
+            self._data.setdefault(
+                CONF_INTERCONNECT_FREE_KWP, DEFAULT_INTERCONNECT_FREE_KWP
+            )
 
         title = self._data.get(CONF_NAME, "GridMetrics")
         return self.async_create_entry(title=title, data=self._data)
@@ -502,50 +463,54 @@ class GridMetricsOptionsFlow(config_entries.OptionsFlow):
             )
 
         data = {**self.config_entry.data, **self.config_entry.options}
-        schema = vol.Schema(
-            {
-                vol.Optional(
-                    CONF_FIXED_CHARGE,
-                    default=data.get(CONF_FIXED_CHARGE, DEFAULT_FIXED_CHARGE),
-                ): vol.Coerce(float),
-                vol.Optional(
-                    CONF_TAX_PERCENT,
-                    default=data.get(CONF_TAX_PERCENT, DEFAULT_TAX_PERCENT),
-                ): vol.Coerce(float),
-                vol.Optional(
-                    CONF_BILLING_CYCLE_DAY,
-                    default=data.get(
-                        CONF_BILLING_CYCLE_DAY, DEFAULT_BILLING_CYCLE_DAY
-                    ),
-                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=28)),
-                vol.Optional(
-                    CONF_EXPORT_RATE,
-                    default=data.get(CONF_EXPORT_RATE, DEFAULT_EXPORT_RATE),
-                ): vol.Coerce(float),
-                vol.Optional(
-                    CONF_SOLAR_CAPACITY_KWP,
-                    default=data.get(CONF_SOLAR_CAPACITY_KWP, DEFAULT_SOLAR_CAPACITY_KWP),
-                ): vol.Coerce(float),
-                vol.Optional(
-                    CONF_INTERCONNECT_RATE,
-                    default=data.get(CONF_INTERCONNECT_RATE, DEFAULT_INTERCONNECT_RATE),
-                ): vol.Coerce(float),
-                vol.Optional(
-                    CONF_INTERCONNECT_FREE_KWP,
-                    default=data.get(CONF_INTERCONNECT_FREE_KWP, DEFAULT_INTERCONNECT_FREE_KWP),
-                ): vol.Coerce(float),
-                vol.Optional(
-                    CONF_CURRENCY,
-                    default=data.get(CONF_CURRENCY, DEFAULT_CURRENCY),
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=CURRENCY_OPTIONS,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    )
+        is_solar = data.get(CONF_SETUP_TYPE) == SETUP_SOLAR_GRID
+
+        schema_dict = {
+            vol.Optional(
+                CONF_FIXED_CHARGE,
+                default=data.get(CONF_FIXED_CHARGE, DEFAULT_FIXED_CHARGE),
+            ): vol.Coerce(float),
+            vol.Optional(
+                CONF_TAX_PERCENT,
+                default=data.get(CONF_TAX_PERCENT, DEFAULT_TAX_PERCENT),
+            ): vol.Coerce(float),
+            vol.Optional(
+                CONF_BILLING_CYCLE_DAY,
+                default=data.get(
+                    CONF_BILLING_CYCLE_DAY, DEFAULT_BILLING_CYCLE_DAY
                 ),
-            }
-        )
-        return self.async_show_form(step_id="general", data_schema=schema)
+            ): vol.All(vol.Coerce(int), vol.Range(min=1, max=28)),
+            vol.Optional(
+                CONF_CURRENCY,
+                default=data.get(CONF_CURRENCY, DEFAULT_CURRENCY),
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=CURRENCY_OPTIONS,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+        }
+
+        # Interconnect / buy-back only relevant for solar + grid setups
+        if is_solar:
+            schema_dict[vol.Optional(
+                CONF_EXPORT_RATE,
+                default=data.get(CONF_EXPORT_RATE, DEFAULT_EXPORT_RATE),
+            )] = vol.Coerce(float)
+            schema_dict[vol.Optional(
+                CONF_SOLAR_CAPACITY_KWP,
+                default=data.get(CONF_SOLAR_CAPACITY_KWP, DEFAULT_SOLAR_CAPACITY_KWP),
+            )] = vol.Coerce(float)
+            schema_dict[vol.Optional(
+                CONF_INTERCONNECT_RATE,
+                default=data.get(CONF_INTERCONNECT_RATE, DEFAULT_INTERCONNECT_RATE),
+            )] = vol.Coerce(float)
+            schema_dict[vol.Optional(
+                CONF_INTERCONNECT_FREE_KWP,
+                default=data.get(CONF_INTERCONNECT_FREE_KWP, DEFAULT_INTERCONNECT_FREE_KWP),
+            )] = vol.Coerce(float)
+
+        return self.async_show_form(step_id="general", data_schema=vol.Schema(schema_dict))
 
     async def async_step_sensors(self, user_input=None):
         """Re-pick solar/grid/source sensors without recreating the entry.
