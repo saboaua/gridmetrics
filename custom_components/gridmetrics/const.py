@@ -1,14 +1,14 @@
 """Constants for GridMetrics."""
 
 DOMAIN = "gridmetrics"
-VERSION = "0.2.8"
+VERSION = "0.2.9"
 
 # Config entry schema version (HA config_entries versioning, NOT the
 # integration release version above). Bump this in lockstep with
 # GridMetricsConfigFlow.VERSION in config_flow.py whenever the stored
 # entry.data schema changes, and add a real migration step in
 # __init__.async_migrate_entry for that bump.
-CONFIG_ENTRY_VERSION = 2
+CONFIG_ENTRY_VERSION = 3
 
 CONF_SOURCE_SENSOR = "source_sensor"
 CONF_CURRENCY = "currency"
@@ -39,6 +39,11 @@ CONF_GRID_SETUP_TYPE = "grid_setup_type"
 GRID_SETUP_SINGLE = "single"
 GRID_SETUP_PHASES = "phases"
 
+# Capacity-based interconnection / grid-usage fee (e.g. Elmar Aruba)
+CONF_SOLAR_CAPACITY_KWP = "solar_capacity_kwp"
+CONF_INTERCONNECT_RATE = "interconnect_rate"
+CONF_INTERCONNECT_FREE_KWP = "interconnect_free_kwp"
+
 RATE_MODE_TIERED = "tiered"
 RATE_MODE_TOU = "tou"
 RATE_MODE_COMBINED = "combined"
@@ -48,6 +53,9 @@ DEFAULT_BILLING_CYCLE_DAY = 1
 DEFAULT_FIXED_CHARGE = 0.0
 DEFAULT_TAX_PERCENT = 0.0
 DEFAULT_EXPORT_RATE = 0.0
+DEFAULT_SOLAR_CAPACITY_KWP = 0.0
+DEFAULT_INTERCONNECT_RATE = 15.0
+DEFAULT_INTERCONNECT_FREE_KWP = 3.0
 
 CURRENCY_OPTIONS = [
     {"value": "USD", "label": "USD - US Dollar"},

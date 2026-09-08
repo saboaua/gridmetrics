@@ -49,10 +49,19 @@ def async_save_cycle_state(hass: HomeAssistant, entry_id: str) -> None:
     last_cycle_start = data.get("last_cycle_start")
     payload = {
         "cycle_start_kwh": data.get("cycle_start_kwh"),
+        "cycle_start_import_kwh": data.get("cycle_start_import_kwh"),
+        "cycle_start_export_kwh": data.get("cycle_start_export_kwh"),
         "last_cycle_start": (
             last_cycle_start.isoformat() if last_cycle_start else None
         ),
         "prepaid_balance": data.get("prepaid_balance", 0.0),
+        "accum_HomeConsumptionEnergySensor": data.get("accum_HomeConsumptionEnergySensor"),
+        "accum_GridImportEnergySensor": data.get("accum_GridImportEnergySensor"),
+        "accum_GridExportEnergySensor": data.get("accum_GridExportEnergySensor"),
+        "accum_SolarProductionEnergySensor": data.get("accum_SolarProductionEnergySensor"),
+        "home_consumption_kwh": data.get("home_consumption_kwh"),
+        "grid_import_kwh": data.get("grid_import_kwh"),
+        "grid_export_kwh": data.get("grid_export_kwh"),
     }
     hass.async_create_task(store.async_save(payload))
 
@@ -106,10 +115,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "config": entry.data,
         "options": entry.options,
         "cycle_start_kwh": saved.get("cycle_start_kwh"),
+        "cycle_start_import_kwh": saved.get("cycle_start_import_kwh"),
+        "cycle_start_export_kwh": saved.get("cycle_start_export_kwh"),
         "last_cycle_start": last_cycle_start,
         "prepaid_balance": saved.get(
             "prepaid_balance", entry.data.get(CONF_PREPAID_BALANCE, 0.0)
         ),
+        "accum_HomeConsumptionEnergySensor": saved.get("accum_HomeConsumptionEnergySensor"),
+        "accum_GridImportEnergySensor": saved.get("accum_GridImportEnergySensor"),
+        "accum_GridExportEnergySensor": saved.get("accum_GridExportEnergySensor"),
+        "accum_SolarProductionEnergySensor": saved.get("accum_SolarProductionEnergySensor"),
+        "home_consumption_kwh": saved.get("home_consumption_kwh"),
+        "grid_import_kwh": saved.get("grid_import_kwh"),
+        "grid_export_kwh": saved.get("grid_export_kwh"),
         "cycle_store": store,
     }
 

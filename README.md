@@ -4,7 +4,7 @@
 
 Tiered / Time-of-Use Electricity Rate Calculator for Home Assistant
 
-[![release](https://img.shields.io/badge/release-v0.2.8-2c3e50)](https://github.com/saboaua/gridmetrics/releases)
+[![release](https://img.shields.io/badge/release-v0.2.9-2c3e50)](https://github.com/saboaua/gridmetrics/releases)
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange)](https://hacs.xyz)
 [![HA](https://img.shields.io/badge/HA-2024.1%2B-41BDF5)](https://www.home-assistant.io)
 [![Buy Me a Coffee](https://img.shields.io/badge/%E2%98%95-Buy%20me%20a%20coffee-FF813F)](https://ko-fi.com/patrickgfortin)
@@ -17,6 +17,13 @@ Calculate accurate electricity costs for **fixed-rate tiered (block) and/or Time
 Designed for the majority of households in North America, the Caribbean, Latin America, Asia and Africa that are **not** on dynamic spot-market tariffs.
 
 ---
+
+## What's new in 0.2.9
+
+| Change | Description |
+|---|---|
+| **Aruba / Elmar-style interconnection fee + buy-back credit** | New config fields: `solar_capacity_kwp`, `interconnect_rate` (default 15), `interconnect_free_kwp` (default 3). Monthly grid-usage fee = max(0, capacity − free) × rate. Estimated / Forecast Bill now subtract the true net-excess export credit (export − import) × buy-back rate. Cycle Consumption for solar homes is now true net metering (`max(0, import − export)`). Energy accumulators and import/export cycle baselines are persisted across restarts. |
+| **Bill sensor attributes** | `Estimated Bill to Date` exposes a full cost breakdown (energy, fixed, interconnect, export credit, net kWh, cycle import/export). |
 
 ## What's new in 0.2.8
 
@@ -141,7 +148,7 @@ data:
 ## Example rates
 
 **Aruba (Elmar)**
-`500:0.3431,1000:0.3531,99999:0.4645` + fixed 12.50 AWG
+`500:0.3431,1000:0.3531,99999:0.4645` + fixed 12.50 AWG + interconnect 15 AWG/kWp (first 3 kWp free) + buy-back ~0.29 AWG/kWh on surplus
 
 **Mexico CFE-style**
 `75:1.12,140:1.37,99999:4.00`

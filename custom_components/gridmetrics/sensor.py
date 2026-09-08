@@ -20,6 +20,7 @@ from homeassistant.util import dt as dt_util
 from . import async_save_cycle_state
 from .const import (
     DOMAIN,
+    VERSION,
     CONF_SOURCE_SENSOR,
     CONF_CURRENCY,
     CONF_BILLING_CYCLE_DAY,
@@ -38,14 +39,23 @@ from .const import (
     CONF_GRID_PHASES,
     CONF_GRID_SIGN,
     CONF_EXPORT_RATE,
+    CONF_SOLAR_CAPACITY_KWP,
+    CONF_INTERCONNECT_RATE,
+    CONF_INTERCONNECT_FREE_KWP,
     RATE_MODE_TIERED,
     RATE_MODE_TOU,
     RATE_MODE_COMBINED,
+    DEFAULT_EXPORT_RATE,
+    DEFAULT_SOLAR_CAPACITY_KWP,
+    DEFAULT_INTERCONNECT_RATE,
+    DEFAULT_INTERCONNECT_FREE_KWP,
 )
 from .calculations import (
     calc_tiered_cost as _calc_tiered_cost,
     get_current_tou_rate as _get_current_tou_rate,
     get_cycle_bounds as _get_cycle_bounds,
+    calc_interconnect_fee as _calc_interconnect_fee,
+    calc_export_credit as _calc_export_credit,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -100,16 +110,7 @@ async def async_setup_entry(
 def _derive_power_w(
     hass: HomeAssistant, entry_id: str | None, entity_id: str, raw_kwh: float
 ) -> float:
-    """Estimate instantaneous power (W) from a cumulative kWh sensor.
-
-    Used when the solar/grid source is marked "cumulative kWh, not live
-    Watts" (CONF_SOLAR_IS_ENERGY / CONF_GRID_IS_ENERGY). Previously that
-    flag caused the reading to be discarded entirely (always 0) - this
-    instead tracks the last value/timestamp per entity_id and reports
-    the rate of change as watts, same as any energy-to-power estimate.
-    A negative delta (counter reset/rollover) reports 0 for that tick
-    rather than a bogus negative power.
-    """
+    """Estimate instantaneous power (W) from a cumulative kWh sensor."""
     if entry_id is None:
         return 0.0
     store = hass.data.get(DOMAIN, {}).get(entry_id)
@@ -203,7 +204,7 @@ class SolarBaseSensor(SensorEntity):
             "name": name_prefix,
             "manufacturer": "GridMetrics",
             "model": "solar_net_metering",
-            "sw_version": "0.2.2",
+            "sw_version": VERSION,
         }
         self._unsub = None
 
@@ -294,8 +295,37 @@ class _EnergyAccumulator(SolarBaseSensor):
         self._kwh = 0.0
         self._last_w = None
         self._last_ts = None
+        self._restored = False
+
+    def _restore_from_store(self) -> None:
+        if self._restored:
+            return
+        data = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id)
+        if data is None:
+            return
+        key = f"accum_{self.__class__.__name__}"
+        saved = data.get(key)
+        if saved is not None:
+            self._kwh = float(saved)
+        self._restored = True
+
+    def _persist(self) -> None:
+        data = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id)
+        if data is None:
+            return
+        key = f"accum_{self.__class__.__name__}"
+        data[key] = self._kwh
+        # Also expose the live totals used by cost sensors
+        if isinstance(self, HomeConsumptionEnergySensor):
+            data["home_consumption_kwh"] = self._kwh
+        elif isinstance(self, GridImportEnergySensor):
+            data["grid_import_kwh"] = self._kwh
+        elif isinstance(self, GridExportEnergySensor):
+            data["grid_export_kwh"] = self._kwh
+        async_save_cycle_state(self.hass, self._entry.entry_id)
 
     def _accumulate(self, power_w: float) -> float:
+        self._restore_from_store()
         now = dt_util.utcnow()
         if self._last_ts is not None and self._last_w is not None:
             hours = (now - self._last_ts).total_seconds() / 3600.0
@@ -303,10 +333,7 @@ class _EnergyAccumulator(SolarBaseSensor):
             self._kwh += max(0.0, avg_w) * hours / 1000.0
         self._last_w = power_w
         self._last_ts = now
-        # Persist for cost sensors
-        data = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id)
-        if data is not None and isinstance(self, HomeConsumptionEnergySensor):
-            data["home_consumption_kwh"] = self._kwh
+        self._persist()
         return self._kwh
 
 
@@ -364,7 +391,7 @@ class BaseCostSensor(SensorEntity):
             "name": name_prefix,
             "manufacturer": "GridMetrics",
             "model": config.get(CONF_RATE_MODE, "tiered"),
-            "sw_version": "0.2.2",
+            "sw_version": VERSION,
         }
         self._source = config.get(CONF_SOURCE_SENSOR)
         self._unsub = None
@@ -395,17 +422,64 @@ class BaseCostSensor(SensorEntity):
             return data.get("home_consumption_kwh")
         return _safe_float(self.hass.states.get(self._source))
 
+    def _get_import_export_kwh(self) -> tuple[float, float]:
+        """Return (cycle_import_kwh, cycle_export_kwh)."""
+        data = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id)
+        if data is None:
+            return 0.0, 0.0
+
+        current_imp = data.get("grid_import_kwh")
+        current_exp = data.get("grid_export_kwh")
+        if current_imp is None and current_exp is None:
+            # Fallback: no solar energy sensors yet → treat source as import
+            src = self._get_source_kwh()
+            return (src or 0.0), 0.0
+
+        current_imp = float(current_imp or 0.0)
+        current_exp = float(current_exp or 0.0)
+
+        billing_day = self._config.get(CONF_BILLING_CYCLE_DAY, 1)
+        cycle_start, _ = _get_cycle_bounds(billing_day, dt_util.now())
+        last_reset = data.get("last_cycle_start")
+
+        if last_reset is None or last_reset < cycle_start:
+            data["cycle_start_import_kwh"] = current_imp
+            data["cycle_start_export_kwh"] = current_exp
+            data["cycle_start_kwh"] = self._get_source_kwh()
+            data["last_cycle_start"] = cycle_start
+            async_save_cycle_state(self.hass, self._entry.entry_id)
+            return 0.0, 0.0
+
+        start_imp = data.get("cycle_start_import_kwh")
+        start_exp = data.get("cycle_start_export_kwh")
+        if start_imp is None:
+            data["cycle_start_import_kwh"] = current_imp
+            start_imp = current_imp
+        if start_exp is None:
+            data["cycle_start_export_kwh"] = current_exp
+            start_exp = current_exp
+            async_save_cycle_state(self.hass, self._entry.entry_id)
+
+        return max(0.0, current_imp - float(start_imp)), max(
+            0.0, current_exp - float(start_exp)
+        )
+
     def _get_cycle_consumption(self) -> float:
+        """Net billed consumption for the current cycle.
+
+        Solar path: max(0, cycle_import - cycle_export)  (true net metering)
+        Grid-only path: delta of the configured source energy sensor.
+        """
+        if self._config.get(CONF_SETUP_TYPE) == SETUP_SOLAR_GRID or self._source == "derived_home_consumption":
+            imp, exp = self._get_import_export_kwh()
+            return max(0.0, imp - exp)
+
         current = self._get_source_kwh()
         if current is None:
             return 0.0
 
         data = self.hass.data.get(DOMAIN, {}).get(self._entry.entry_id)
         if data is None:
-            # Entry is mid-reload (e.g. options were just saved) and
-            # hasn't repopulated hass.data yet - report 0 instead of
-            # raising, so a burst of source-sensor updates during the
-            # reload window can't hammer the logger with KeyErrors.
             return 0.0
         start_kwh = data.get("cycle_start_kwh")
         billing_day = self._config.get(CONF_BILLING_CYCLE_DAY, 1)
@@ -424,6 +498,45 @@ class BaseCostSensor(SensorEntity):
             return 0.0
 
         return max(0.0, current - start_kwh)
+
+    def _calc_bill_components(self, net_kwh: float, cycle_imp: float, cycle_exp: float) -> dict:
+        """Shared bill math for Estimated + Forecast sensors."""
+        mode = self._config.get(CONF_RATE_MODE, RATE_MODE_TIERED)
+        fixed = float(self._config.get(CONF_FIXED_CHARGE, 0.0) or 0.0)
+        tax_pct = float(self._config.get(CONF_TAX_PERCENT, 0.0) or 0.0)
+        export_rate = float(self._config.get(CONF_EXPORT_RATE, DEFAULT_EXPORT_RATE) or 0.0)
+        capacity = float(self._config.get(CONF_SOLAR_CAPACITY_KWP, DEFAULT_SOLAR_CAPACITY_KWP) or 0.0)
+        ic_rate = float(self._config.get(CONF_INTERCONNECT_RATE, DEFAULT_INTERCONNECT_RATE) or 0.0)
+        ic_free = float(self._config.get(CONF_INTERCONNECT_FREE_KWP, DEFAULT_INTERCONNECT_FREE_KWP) or 0.0)
+
+        energy_cost = 0.0
+        if mode == RATE_MODE_TIERED:
+            energy_cost, _, _ = _calc_tiered_cost(net_kwh, self._config.get(CONF_TIERS, []))
+        elif mode == RATE_MODE_TOU:
+            rate, _ = _get_current_tou_rate(self._config.get(CONF_TOU_PERIODS, []))
+            energy_cost = net_kwh * rate
+        elif mode == RATE_MODE_COMBINED:
+            energy_cost, _, _ = _calc_tiered_cost(net_kwh, self._config.get(CONF_TIERS, []))
+
+        interconnect = _calc_interconnect_fee(capacity, ic_rate, ic_free)
+        credit = _calc_export_credit(cycle_exp, cycle_imp, export_rate)
+
+        subtotal = energy_cost + fixed + interconnect - credit
+        total = subtotal * (1 + tax_pct / 100.0)
+
+        return {
+            "energy_cost": round(energy_cost, 4),
+            "fixed": round(fixed, 4),
+            "interconnect": round(interconnect, 4),
+            "export_credit": round(credit, 4),
+            "subtotal": round(subtotal, 4),
+            "tax_pct": tax_pct,
+            "total": round(total, 2),
+            "net_kwh": round(net_kwh, 3),
+            "cycle_import_kwh": round(cycle_imp, 3),
+            "cycle_export_kwh": round(cycle_exp, 3),
+            "capacity_kwp": capacity,
+        }
 
 
 class MarginalRateSensor(BaseCostSensor):
@@ -459,7 +572,7 @@ class MarginalRateSensor(BaseCostSensor):
 
 
 class EstimatedBillSensor(BaseCostSensor):
-    """Running estimated bill - no MONETARY device_class (HA compatibility)."""
+    """Running estimated bill – includes interconnect fee & export credit."""
 
     _attr_name = "Estimated Bill to Date"
     _attr_state_class = SensorStateClass.TOTAL
@@ -472,29 +585,28 @@ class EstimatedBillSensor(BaseCostSensor):
     @property
     def native_value(self) -> float | None:
         try:
-            consumption = self._get_cycle_consumption()
-            mode = self._config.get(CONF_RATE_MODE, RATE_MODE_TIERED)
-            fixed = float(self._config.get(CONF_FIXED_CHARGE, 0.0) or 0.0)
-            tax_pct = float(self._config.get(CONF_TAX_PERCENT, 0.0) or 0.0)
-
-            energy_cost = 0.0
-            if mode == RATE_MODE_TIERED:
-                energy_cost, _, _ = _calc_tiered_cost(
-                    consumption, self._config.get(CONF_TIERS, [])
-                )
-            elif mode == RATE_MODE_TOU:
-                rate, _ = _get_current_tou_rate(self._config.get(CONF_TOU_PERIODS, []))
-                energy_cost = consumption * rate
-            elif mode == RATE_MODE_COMBINED:
-                energy_cost, _, _ = _calc_tiered_cost(
-                    consumption, self._config.get(CONF_TIERS, [])
-                )
-
-            subtotal = energy_cost + fixed
-            return round(subtotal * (1 + tax_pct / 100.0), 2)
+            imp, exp = self._get_import_export_kwh()
+            net = max(0.0, imp - exp) if (
+                self._config.get(CONF_SETUP_TYPE) == SETUP_SOLAR_GRID
+                or self._source == "derived_home_consumption"
+            ) else self._get_cycle_consumption()
+            components = self._calc_bill_components(net, imp, exp)
+            return components["total"]
         except Exception as err:
             _LOGGER.debug("Estimated bill calc error: %s", err)
             return 0.0
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        try:
+            imp, exp = self._get_import_export_kwh()
+            net = max(0.0, imp - exp) if (
+                self._config.get(CONF_SETUP_TYPE) == SETUP_SOLAR_GRID
+                or self._source == "derived_home_consumption"
+            ) else self._get_cycle_consumption()
+            return self._calc_bill_components(net, imp, exp)
+        except Exception:
+            return {}
 
 
 class CycleConsumptionSensor(BaseCostSensor):
@@ -508,9 +620,18 @@ class CycleConsumptionSensor(BaseCostSensor):
     def native_value(self) -> float | None:
         return round(self._get_cycle_consumption(), 3)
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        imp, exp = self._get_import_export_kwh()
+        return {
+            "cycle_import_kwh": round(imp, 3),
+            "cycle_export_kwh": round(exp, 3),
+            "net_kwh": round(max(0.0, imp - exp), 3),
+        }
+
 
 class ForecastBillSensor(BaseCostSensor):
-    """Forecast bill - no MONETARY device_class (HA compatibility)."""
+    """Forecast bill – projects net kWh and applies same fee/credit structure."""
 
     _attr_name = "Forecast Bill"
     _attr_state_class = SensorStateClass.TOTAL
@@ -523,28 +644,28 @@ class ForecastBillSensor(BaseCostSensor):
     @property
     def native_value(self) -> float | None:
         try:
-            consumption = self._get_cycle_consumption()
             billing_day = self._config.get(CONF_BILLING_CYCLE_DAY, 1)
             now = dt_util.now()
             start, end = _get_cycle_bounds(billing_day, now)
             days_elapsed = max(1.0, (now - start).total_seconds() / 86400)
             total_days = max(1.0, (end - start).total_seconds() / 86400)
-            projected_kwh = consumption * (total_days / days_elapsed)
+            factor = total_days / days_elapsed
 
-            mode = self._config.get(CONF_RATE_MODE, RATE_MODE_TIERED)
-            fixed = float(self._config.get(CONF_FIXED_CHARGE, 0.0) or 0.0)
-            tax_pct = float(self._config.get(CONF_TAX_PERCENT, 0.0) or 0.0)
-
-            if mode in (RATE_MODE_TIERED, RATE_MODE_COMBINED):
-                energy_cost, _, _ = _calc_tiered_cost(
-                    projected_kwh, self._config.get(CONF_TIERS, [])
-                )
+            imp, exp = self._get_import_export_kwh()
+            if (
+                self._config.get(CONF_SETUP_TYPE) == SETUP_SOLAR_GRID
+                or self._source == "derived_home_consumption"
+            ):
+                proj_imp = imp * factor
+                proj_exp = exp * factor
+                net = max(0.0, proj_imp - proj_exp)
             else:
-                rate, _ = _get_current_tou_rate(self._config.get(CONF_TOU_PERIODS, []))
-                energy_cost = projected_kwh * rate
+                consumption = self._get_cycle_consumption()
+                net = consumption * factor
+                proj_imp, proj_exp = net, 0.0
 
-            subtotal = energy_cost + fixed
-            return round(subtotal * (1 + tax_pct / 100.0), 2)
+            components = self._calc_bill_components(net, proj_imp, proj_exp)
+            return components["total"]
         except Exception as err:
             _LOGGER.debug("Forecast bill calc error: %s", err)
             return 0.0

@@ -92,3 +92,43 @@ def get_current_tou_rate(periods: list[dict], now: datetime | None = None) -> tu
     if periods:
         return float(periods[-1]["rate"]), periods[-1]["name"]
     return 0.0, "unknown"
+
+
+def calc_interconnect_fee(
+    capacity_kwp: float,
+    rate_per_kwp: float,
+    free_kwp: float = 0.0,
+) -> float:
+    """
+    Capacity-based monthly grid-usage / interconnection fee.
+
+    Elmar Aruba residential example:
+        capacity=6, rate=15, free=3  →  (6-3)*15 = 45 AWG
+        capacity=10, rate=15, free=3 → (10-3)*15 = 105 AWG
+        capacity=2, rate=15, free=3  → 0 (under free allowance)
+    """
+    if capacity_kwp <= 0 or rate_per_kwp <= 0:
+        return 0.0
+    billable = max(0.0, float(capacity_kwp) - float(free_kwp))
+    return billable * float(rate_per_kwp)
+
+
+def calc_export_credit(
+    export_kwh: float,
+    import_kwh: float,
+    buyback_rate: float,
+) -> float:
+    """
+    Credit for net excess export (after offsetting grid import).
+
+    Example (user): exported 900, imported/used 800, rate 0.2916
+        → max(0, 900-800) * 0.2916 = 29.16
+
+    Matches Elmar-style net metering + surplus buy-back:
+    self-consumption offsets 1:1; only the true monthly surplus is
+    purchased at the reduced buy-back rate.
+    """
+    if buyback_rate <= 0:
+        return 0.0
+    excess = max(0.0, float(export_kwh) - float(import_kwh))
+    return excess * float(buyback_rate)

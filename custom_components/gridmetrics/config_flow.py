@@ -42,6 +42,12 @@ from .const import (
     DEFAULT_FIXED_CHARGE,
     DEFAULT_TAX_PERCENT,
     DEFAULT_EXPORT_RATE,
+    CONF_SOLAR_CAPACITY_KWP,
+    CONF_INTERCONNECT_RATE,
+    CONF_INTERCONNECT_FREE_KWP,
+    DEFAULT_SOLAR_CAPACITY_KWP,
+    DEFAULT_INTERCONNECT_RATE,
+    DEFAULT_INTERCONNECT_FREE_KWP,
     CURRENCY_OPTIONS,
 )
 
@@ -218,6 +224,15 @@ class GridMetricsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._data[CONF_EXPORT_RATE] = user_input.get(
                 CONF_EXPORT_RATE, DEFAULT_EXPORT_RATE
             )
+            self._data[CONF_SOLAR_CAPACITY_KWP] = user_input.get(
+                CONF_SOLAR_CAPACITY_KWP, DEFAULT_SOLAR_CAPACITY_KWP
+            )
+            self._data[CONF_INTERCONNECT_RATE] = user_input.get(
+                CONF_INTERCONNECT_RATE, DEFAULT_INTERCONNECT_RATE
+            )
+            self._data[CONF_INTERCONNECT_FREE_KWP] = user_input.get(
+                CONF_INTERCONNECT_FREE_KWP, DEFAULT_INTERCONNECT_FREE_KWP
+            )
             return await self._after_sensors()
 
         return self.async_show_form(
@@ -258,6 +273,15 @@ class GridMetricsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_EXPORT_RATE, default=DEFAULT_EXPORT_RATE): vol.Coerce(
                     float
                 ),
+                vol.Optional(
+                    CONF_SOLAR_CAPACITY_KWP, default=DEFAULT_SOLAR_CAPACITY_KWP
+                ): vol.Coerce(float),
+                vol.Optional(
+                    CONF_INTERCONNECT_RATE, default=DEFAULT_INTERCONNECT_RATE
+                ): vol.Coerce(float),
+                vol.Optional(
+                    CONF_INTERCONNECT_FREE_KWP, default=DEFAULT_INTERCONNECT_FREE_KWP
+                ): vol.Coerce(float),
             }
         )
 
@@ -273,6 +297,15 @@ class GridMetricsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
             self._data[CONF_EXPORT_RATE] = user_input.get(
                 CONF_EXPORT_RATE, DEFAULT_EXPORT_RATE
+            )
+            self._data[CONF_SOLAR_CAPACITY_KWP] = user_input.get(
+                CONF_SOLAR_CAPACITY_KWP, DEFAULT_SOLAR_CAPACITY_KWP
+            )
+            self._data[CONF_INTERCONNECT_RATE] = user_input.get(
+                CONF_INTERCONNECT_RATE, DEFAULT_INTERCONNECT_RATE
+            )
+            self._data[CONF_INTERCONNECT_FREE_KWP] = user_input.get(
+                CONF_INTERCONNECT_FREE_KWP, DEFAULT_INTERCONNECT_FREE_KWP
             )
             return await self._after_sensors()
 
@@ -304,6 +337,15 @@ class GridMetricsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_EXPORT_RATE, default=DEFAULT_EXPORT_RATE): vol.Coerce(
                     float
                 ),
+                vol.Optional(
+                    CONF_SOLAR_CAPACITY_KWP, default=DEFAULT_SOLAR_CAPACITY_KWP
+                ): vol.Coerce(float),
+                vol.Optional(
+                    CONF_INTERCONNECT_RATE, default=DEFAULT_INTERCONNECT_RATE
+                ): vol.Coerce(float),
+                vol.Optional(
+                    CONF_INTERCONNECT_FREE_KWP, default=DEFAULT_INTERCONNECT_FREE_KWP
+                ): vol.Coerce(float),
             }
         )
         return self.async_show_form(
@@ -479,6 +521,18 @@ class GridMetricsOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional(
                     CONF_EXPORT_RATE,
                     default=data.get(CONF_EXPORT_RATE, DEFAULT_EXPORT_RATE),
+                ): vol.Coerce(float),
+                vol.Optional(
+                    CONF_SOLAR_CAPACITY_KWP,
+                    default=data.get(CONF_SOLAR_CAPACITY_KWP, DEFAULT_SOLAR_CAPACITY_KWP),
+                ): vol.Coerce(float),
+                vol.Optional(
+                    CONF_INTERCONNECT_RATE,
+                    default=data.get(CONF_INTERCONNECT_RATE, DEFAULT_INTERCONNECT_RATE),
+                ): vol.Coerce(float),
+                vol.Optional(
+                    CONF_INTERCONNECT_FREE_KWP,
+                    default=data.get(CONF_INTERCONNECT_FREE_KWP, DEFAULT_INTERCONNECT_FREE_KWP),
                 ): vol.Coerce(float),
                 vol.Optional(
                     CONF_CURRENCY,

@@ -58,7 +58,10 @@
           "phase_c": "Phase C power sensor",
           "grid_is_energy": "These are cumulative kWh sensors (not live Watts)",
           "grid_sign": "What does a positive number mean?",
-          "export_rate": "Feed-in credit per kWh (0 if none)"
+          "export_rate": "Buy-back / surplus rate per kWh (0 if none)",
+          "solar_capacity_kwp": "Solar system size (kWp)",
+          "interconnect_rate": "Interconnection / grid-usage fee per kWp",
+          "interconnect_free_kwp": "Free capacity allowance (kWp, e.g. 3 for Elmar)"
         }
       },
       "grid_single": {
@@ -68,7 +71,10 @@
           "grid_sensor": "Grid net power sensor",
           "grid_is_energy": "This is a cumulative kWh sensor (not live Watts)",
           "grid_sign": "What does a positive number mean?",
-          "export_rate": "Feed-in credit per kWh (0 if none)"
+          "export_rate": "Buy-back / surplus rate per kWh (0 if none)",
+          "solar_capacity_kwp": "Solar system size (kWp)",
+          "interconnect_rate": "Interconnection / grid-usage fee per kWp",
+          "interconnect_free_kwp": "Free capacity allowance (kWp, e.g. 3 for Elmar)"
         }
       },
       "source": {
@@ -114,11 +120,14 @@
       "general": {
         "title": "General settings",
         "data": {
-          "fixed_charge": "Monthly fixed charge",
+          "fixed_charge": "Monthly fixed / access charge",
           "tax_percent": "Tax percent",
-          "billing_cycle_day": "Billing cycle start day",
-          "export_rate": "Feed-in rate",
-          "currency": "Currency"
+          "billing_cycle_day": "Billing cycle start day (1-28)",
+          "export_rate": "Buy-back / surplus rate per kWh",
+          "currency": "Currency",
+          "solar_capacity_kwp": "Solar system size (kWp)",
+          "interconnect_rate": "Interconnection fee per kWp",
+          "interconnect_free_kwp": "Free capacity allowance (kWp)"
         }
       },
       "sensors": {
