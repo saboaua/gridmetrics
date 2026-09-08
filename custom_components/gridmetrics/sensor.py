@@ -90,7 +90,7 @@ async def async_setup_entry(
         entities.append(PrepaidBalanceSensor(hass, entry, config, name_prefix))
 
     # Solar + grid derived sensors
-    if config.get(CONF_SETUP_TYPE) == SETUP_SOLAR_GRID or config.get("has_solar"):
+    if config.get(CONF_SETUP_TYPE) == SETUP_SOLAR_GRID:
         entities.extend(
             [
                 SolarProductionPowerSensor(hass, entry, config, name_prefix),
@@ -540,7 +540,7 @@ class BaseCostSensor(SensorEntity):
 class MarginalRateSensor(BaseCostSensor):
     _attr_name = "Marginal Rate"
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_icon = "mdi:currency-usd"
+    _attr_icon = "mdi:cash"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

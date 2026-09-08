@@ -7,5 +7,27 @@
     "sensor"
   ],
   "homeassistant": "2024.1.0",
-  "iot_class": "Local Polling"
+  "iot_class": "Local Polling",
+  "country": [
+    "AW",
+    "US",
+    "MX",
+    "JM",
+    "BB",
+    "TT",
+    "CA",
+    "BR",
+    "CO",
+    "AR",
+    "CL",
+    "PE",
+    "IN",
+    "ZA",
+    "NG",
+    "KE",
+    "PH",
+    "TH",
+    "NL",
+    "GB"
+  ]
 }

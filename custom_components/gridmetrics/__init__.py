@@ -13,7 +13,6 @@ import voluptuous as vol
 
 from .const import (
     DOMAIN,
-    CONF_PREPAID_ENABLED,
     CONF_PREPAID_BALANCE,
     CONFIG_ENTRY_VERSION,
 )
